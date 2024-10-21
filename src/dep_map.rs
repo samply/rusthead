@@ -2,15 +2,18 @@ use std::{
     any::{Any, TypeId},
     collections::HashMap,
     marker::PhantomData,
-    ops::Deref,
 };
 
 use solvent::DepGraph;
+use typeid::ConstTypeId;
 
-use crate::{services::Service, Config};
+use crate::{
+    services::{Service, ToCompose},
+    Config,
+};
 
 #[derive(Default)]
-pub struct ServiceMap(HashMap<TypeId, Box<dyn Service>>);
+pub struct ServiceMap(HashMap<TypeId, Box<dyn ToCompose>>);
 
 impl std::fmt::Debug for ServiceMap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -19,19 +22,19 @@ impl std::fmt::Debug for ServiceMap {
 }
 
 impl ServiceMap {
-    fn get<T: Service + Any>(&self) -> Option<&T> {
+    fn get<T: ToCompose + Any>(&self) -> Option<&T> {
         self.0
             .get(&TypeId::of::<T>())
-            .map(|v| unsafe { &*(v.as_ref() as *const dyn Service as *const T) })
+            .map(|v| unsafe { &*(v.as_ref() as *const dyn ToCompose as *const T) })
     }
 
-    pub fn get_mut<T: Service + Any>(&mut self) -> Option<&mut T> {
+    pub fn get_mut<T: ToCompose + Any>(&mut self) -> Option<&mut T> {
         self.0
             .get_mut(&TypeId::of::<T>())
-            .map(|v| unsafe { &mut *(v.as_mut() as *mut dyn Service as *mut T) })
+            .map(|v| unsafe { &mut *(v.as_mut() as *mut dyn ToCompose as *mut T) })
     }
 
-    fn insert<T: Service + Any>(&mut self, v: T) {
+    fn insert<T: ToCompose + Any>(&mut self, v: T) {
         self.0.insert(TypeId::of::<T>(), Box::new(v));
     }
 
@@ -72,31 +75,40 @@ pub struct DepEntry<'a, T> {
 #[derive(Debug, Default)]
 pub struct DepMap {
     post_initializers: HashMap<TypeId, DepEntryInner>,
-    constructors: HashMap<TypeId, fn(&Config, &mut ServiceMap) -> Box<dyn Service>>,
     dep_tree: DepGraph<TypeId>,
 }
 
-trait BoxService: Service {
-    fn construct(conf: &Config, deps: &mut ServiceMap) -> Box<dyn Service>
-    where
-        Self: Sized + 'static,
-    {
-        Box::new(Self::from_config(conf, deps))
-    }
+inventory::collect!(Constructor);
+
+pub struct Constructor {
+    output_type_id: ConstTypeId,
+    service_constructor: &'static (dyn Service + Sync),
 }
 
-impl<T: Service> BoxService for T {}
+impl Constructor {
+    pub const fn new<T: Any>(service_constructor: &'static (dyn Service + Sync)) -> Self {
+        Self {
+            output_type_id: ConstTypeId::of::<T>(),
+            service_constructor,
+        }
+    }
+}
 
 type DepTreeRoot = ();
 
 impl DepMap {
-    pub fn ensure_installed<T: Any + Service>(&mut self) -> DepEntry<'_, T> {
+    pub fn ensure_installed<T: ToCompose + 'static>(&mut self) -> DepEntry<'_, T> {
         let type_id = TypeId::of::<T>();
         self.dep_tree
             .register_dependency(TypeId::of::<DepTreeRoot>(), type_id);
-        let depends_on = T::dependecies(self);
-        self.dep_tree.register_dependencies(type_id, depends_on);
-        self.constructors.entry(type_id).or_insert(T::construct);
+        let constructor = inventory::iter::<Constructor>()
+            .find(|v| v.output_type_id == type_id)
+            .expect(&format!(
+                "{} is not a registered service",
+                std::any::type_name::<T>()
+            ));
+        self.dep_tree
+            .register_dependencies(type_id, constructor.service_constructor.dependecies());
         let inner = self
             .post_initializers
             .entry(type_id)
@@ -122,8 +134,12 @@ impl DepMap {
             if *dep_id == TypeId::of::<DepTreeRoot>() {
                 continue;
             }
-            let constructor = self.constructors.get(dep_id).unwrap();
-            let mut dep = constructor(conf, &mut realized);
+            let constructor = inventory::iter::<Constructor>()
+                .find(|v| v.output_type_id == *dep_id)
+                .unwrap();
+            let mut dep = constructor
+                .service_constructor
+                .from_config(conf, &mut realized);
             if let Some(post_init) = self.post_initializers.remove(dep_id) {
                 for post_init_fn in post_init.on_created {
                     post_init_fn(&mut dep);
@@ -143,4 +159,3 @@ impl<'a, T: Any> DepEntry<'a, T> {
         self
     }
 }
-

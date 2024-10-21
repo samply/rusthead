@@ -1,14 +1,10 @@
-use std::{any::TypeId, collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, marker::PhantomData};
 
 use http::Uri;
 
-use crate::{
-    dep_map::{DepMap, ServiceMap},
-    utils::generate_password,
-    Config,
-};
+use crate::{dep_map::Constructor, utils::generate_password, Config};
 
-use super::Service;
+use super::ToCompose;
 
 pub trait BeamProxyKind {
     const BROKER_URL_STR: &str;
@@ -35,8 +31,20 @@ impl<T: BeamProxyKind> BeamProxy<T> {
     }
 
     pub fn get_url(&self) -> Uri {
-        T::broker_url()
+        Uri::from_static("http://beam-proxy")
     }
+}
+
+fn make_beam_proxy<T: BeamProxyKind>(conf: &Config) -> BeamProxy<T> {
+    BeamProxy {
+        kind: PhantomData,
+        proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
+        app_keys: Default::default(),
+    }
+}
+
+inventory::submit! {
+    Constructor::new::<DktkBeamProxy>(&(make_beam_proxy as fn(&Config) -> DktkBeamProxy))
 }
 
 pub struct DktkBroker;
@@ -47,18 +55,7 @@ impl BeamProxyKind for DktkBroker {
 
 pub type DktkBeamProxy = BeamProxy<DktkBroker>;
 
-impl<T: BeamProxyKind + 'static> Service for BeamProxy<T> {
-    fn from_config(conf: &Config, _deps: &mut ServiceMap) -> Self
-    where
-        Self: Sized,
-    {
-        Self {
-            kind: PhantomData,
-            app_keys: HashMap::new(),
-            proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
-        }
-    }
-
+impl<T: BeamProxyKind> ToCompose for BeamProxy<T> {
     #[rustfmt::skip]
     fn to_compose(&self) -> serde_yaml::Value {
         let Self { kind: _, proxy_id, app_keys } = self;
@@ -73,13 +70,9 @@ impl<T: BeamProxyKind + 'static> Service for BeamProxy<T> {
         ))
         .unwrap();
         let envs = yaml["beam-proxy"]["environment"].as_mapping_mut().unwrap();
-        for (app_name, secret) in &self.app_keys {
+        for (app_name, secret) in app_keys {
             envs.insert(format!("APP_{app_name}_KEY").into(), secret.clone().into());
         }
         yaml
-    }
-
-    fn dependecies(_deps: &mut DepMap) -> Vec<TypeId> {
-        Vec::new()
     }
 }

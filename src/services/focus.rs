@@ -1,13 +1,13 @@
-use std::{any::TypeId, marker::PhantomData};
+use std::marker::PhantomData;
 
 use http::Uri;
 
-use crate::{
-    dep_map::{DepMap, ServiceMap},
-    services::beam::DktkBeamProxy,
-};
+use crate::{dep_map::Constructor, services::beam::DktkBroker, Config};
 
-use super::{beam::BeamProxyKind, Service};
+use super::{
+    beam::{BeamProxy, BeamProxyKind},
+    ToCompose,
+};
 
 pub struct Focus<T: BeamProxyKind> {
     beam_id: String,
@@ -16,26 +16,7 @@ pub struct Focus<T: BeamProxyKind> {
     proxy: PhantomData<T>,
 }
 
-impl<T: BeamProxyKind> Service for Focus<T> {
-    fn from_config(_conf: &crate::Config, deps: &mut ServiceMap) -> Self
-    where
-        Self: Sized,
-    {
-        let beam_proxy = deps.get_mut::<DktkBeamProxy>().unwrap();
-        let (beam_id, beam_secret) = beam_proxy.add_service("focus");
-        Focus {
-            proxy: PhantomData,
-            beam_id,
-            beam_secret,
-            beam_url: beam_proxy.get_url(),
-        }
-    }
-
-    fn dependecies(deps: &mut DepMap) -> Vec<TypeId> {
-        deps.ensure_installed::<DktkBeamProxy>();
-        vec![DktkBeamProxy::type_id()]
-    }
-
+impl<T: BeamProxyKind> ToCompose for Focus<T> {
     #[rustfmt::skip]
     fn to_compose(&self) -> serde_yaml::Value {
         let Self { beam_id, beam_secret, beam_url, proxy: _ } = self;
@@ -48,4 +29,18 @@ impl<T: BeamProxyKind> Service for Focus<T> {
             BEAM_SECRET: "{beam_secret}"
         "###)).unwrap()
     }
+}
+
+fn make_focus<T: BeamProxyKind>(_conf: &Config, beam_proxy: &mut BeamProxy<T>) -> Focus<T> {
+    let (beam_id, beam_secret) = beam_proxy.add_service("focus");
+    Focus {
+        proxy: PhantomData,
+        beam_id,
+        beam_secret,
+        beam_url: beam_proxy.get_url(),
+    }
+}
+
+inventory::submit! {
+    Constructor::new::<Focus<DktkBroker>>(&(make_focus as fn(&Config, &mut BeamProxy<DktkBroker>) -> Focus<DktkBroker>))
 }
