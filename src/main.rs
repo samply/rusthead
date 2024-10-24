@@ -7,9 +7,9 @@
 //! 2:
 //! A service is an abstraction around a container and the Config is a hardcoded struct which gets deserialized and based on that we create these services programatically
 
-use dep_map::DepMap;
+use dep_map::ServiceMap;
 use serde::{Deserialize, Serialize};
-use services::beam;
+use services::{beam::DktkBroker, focus::Focus};
 use url::Url;
 mod dep_map;
 mod services;
@@ -43,15 +43,13 @@ fn main() -> anyhow::Result<()> {
         site_id: "test".into(),
     };
 
-    let mut dep_map = DepMap::default();
     match conf.project {
         Project::Ccp => {
-            dep_map.ensure_installed::<services::focus::Focus<beam::DktkBroker>>();
+            let stuff = services::make_services::<Focus<DktkBroker>>(&conf);
+            println!("{}", serde_yaml::to_string(&stuff.to_compose()).unwrap());
         }
         Project::Bbmri => todo!(),
         Project::Minimal => todo!(),
     }
-    let compose = dep_map.realize(&conf).to_compose();
-    println!("{}", serde_yaml::to_string(&compose).unwrap());
     Ok(())
 }

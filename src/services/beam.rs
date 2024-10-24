@@ -2,9 +2,9 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use http::Uri;
 
-use crate::{dep_map::Constructor, utils::generate_password, Config};
+use crate::{utils::generate_password, Config};
 
-use super::ToCompose;
+use super::{Service, ToCompose};
 
 pub trait BeamProxyKind {
     const BROKER_URL_STR: &str;
@@ -35,16 +35,16 @@ impl<T: BeamProxyKind> BeamProxy<T> {
     }
 }
 
-fn make_beam_proxy<T: BeamProxyKind>(conf: &Config) -> BeamProxy<T> {
-    BeamProxy {
-        kind: PhantomData,
-        proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
-        app_keys: Default::default(),
-    }
-}
+impl<T: BeamProxyKind> Service for BeamProxy<T> {
+    type Inputs = ();
 
-inventory::submit! {
-    Constructor::new::<DktkBeamProxy>(&(make_beam_proxy as fn(&Config) -> DktkBeamProxy))
+    fn from_config(conf: &Config, _: &mut Self::Inputs) -> Self {
+        BeamProxy {
+            kind: PhantomData,
+            proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
+            app_keys: Default::default(),
+        }
+    }
 }
 
 pub struct DktkBroker;
