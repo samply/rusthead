@@ -2,11 +2,11 @@ use std::marker::PhantomData;
 
 use http::Uri;
 
-use crate::{dep_map::Constructor, services::beam::DktkBroker, Config};
+use crate::Config;
 
 use super::{
     beam::{BeamProxy, BeamProxyKind},
-    ToCompose,
+    Service, ToCompose,
 };
 
 pub struct Focus<T: BeamProxyKind> {
@@ -31,16 +31,19 @@ impl<T: BeamProxyKind> ToCompose for Focus<T> {
     }
 }
 
-fn make_focus<T: BeamProxyKind>(_conf: &Config, beam_proxy: &mut BeamProxy<T>) -> Focus<T> {
-    let (beam_id, beam_secret) = beam_proxy.add_service("focus");
-    Focus {
-        proxy: PhantomData,
-        beam_id,
-        beam_secret,
-        beam_url: beam_proxy.get_url(),
-    }
-}
+impl<T: BeamProxyKind + 'static> Service for Focus<T> {
+    type Inputs = BeamProxy<T>;
 
-inventory::submit! {
-    Constructor::new::<Focus<DktkBroker>>(&(make_focus as fn(&Config, &mut BeamProxy<DktkBroker>) -> Focus<DktkBroker>))
+    fn from_config(_conf: &Config, beam_proxy: &mut Self::Inputs) -> Self
+    where
+        Self: Sized,
+    {
+        let (beam_id, beam_secret) = beam_proxy.add_service("focus");
+        Focus {
+            proxy: PhantomData,
+            beam_id,
+            beam_secret,
+            beam_url: beam_proxy.get_url(),
+        }
+    }
 }
