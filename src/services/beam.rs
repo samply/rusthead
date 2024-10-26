@@ -6,7 +6,7 @@ use crate::{utils::generate_password, Config};
 
 use super::{Service, ToCompose};
 
-pub trait BeamProxyKind {
+pub trait BeamBrokerKind {
     const BROKER_URL_STR: &str;
 
     fn broker_url() -> Uri {
@@ -15,12 +15,12 @@ pub trait BeamProxyKind {
 }
 
 #[derive(Debug)]
-pub struct BeamProxy<T: BeamProxyKind> {
+pub struct BeamProxy<T: BeamBrokerKind> {
     kind: PhantomData<T>,
     proxy_id: String,
     app_keys: HashMap<&'static str, String>,
 }
-impl<T: BeamProxyKind> BeamProxy<T> {
+impl<T: BeamBrokerKind> BeamProxy<T> {
     /// Returns (BeamAppId, BeamSecret)
     pub fn add_service(&mut self, service_name: &'static str) -> (String, String) {
         let secret = self
@@ -35,10 +35,10 @@ impl<T: BeamProxyKind> BeamProxy<T> {
     }
 }
 
-impl<T: BeamProxyKind + 'static> Service for BeamProxy<T> {
-    type Inputs = ();
+impl<T: BeamBrokerKind + 'static> Service for BeamProxy<T> {
+    type Inputs<'a> = ();
 
-    fn from_config(conf: &Config, _: &mut Self::Inputs) -> Self {
+    fn from_config(conf: &Config, _: Self::Inputs<'_>) -> Self {
         BeamProxy {
             kind: PhantomData,
             proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
@@ -49,13 +49,13 @@ impl<T: BeamProxyKind + 'static> Service for BeamProxy<T> {
 
 pub struct DktkBroker;
 
-impl BeamProxyKind for DktkBroker {
+impl BeamBrokerKind for DktkBroker {
     const BROKER_URL_STR: &str = "https://asf.const";
 }
 
 pub type DktkBeamProxy = BeamProxy<DktkBroker>;
 
-impl<T: BeamProxyKind> ToCompose for BeamProxy<T> {
+impl<T: BeamBrokerKind> ToCompose for BeamProxy<T> {
     #[rustfmt::skip]
     fn to_compose(&self) -> serde_yaml::Value {
         let Self { kind: _, proxy_id, app_keys } = self;
