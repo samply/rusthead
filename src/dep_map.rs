@@ -3,7 +3,10 @@ use std::{
     collections::HashMap,
 };
 
-use crate::services::ToCompose;
+use crate::{
+    services::{Service, ToCompose},
+    Config,
+};
 
 #[derive(Default)]
 pub struct ServiceMap(pub(crate) HashMap<TypeId, Box<dyn ToCompose>>);
@@ -15,12 +18,6 @@ impl std::fmt::Debug for ServiceMap {
 }
 
 impl ServiceMap {
-    pub fn get<T: ToCompose + Any>(&self) -> Option<&T> {
-        self.0
-            .get(&TypeId::of::<T>())
-            .map(|v| unsafe { &*(v.as_ref() as *const dyn ToCompose as *const T) })
-    }
-
     pub fn get_mut<T: ToCompose + Any>(&mut self) -> Option<&mut T> {
         self.0
             .get_mut(&TypeId::of::<T>())
@@ -31,18 +28,16 @@ impl ServiceMap {
         self.0.insert(TypeId::of::<T>(), Box::new(v));
     }
 
-    pub fn contains<T: ToCompose + Any>(&mut self) -> bool {
+    pub fn contains<T: ToCompose + Any>(&self) -> bool {
         self.0.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn remove<T: ToCompose + Any>(&mut self) -> Option<T> {
-        self.0
-            .remove(&TypeId::of::<T>())
-            .map(|v| unsafe { (Box::into_raw(v) as *mut T).read() })
+    pub fn install<T: Service>(&mut self, conf: &Config) {
+        T::get_or_create(conf, self);
     }
 
     pub fn to_compose(&self) -> serde_yaml::Value {
-        serde_yaml::Value::Mapping(serde_yaml::Mapping::from_iter([(
+        serde_yaml::Mapping::from_iter([(
             "services".into(),
             serde_yaml::Value::Mapping(self.0.iter().fold(
                 serde_yaml::Mapping::new(),
@@ -54,6 +49,7 @@ impl ServiceMap {
                     acc
                 },
             )),
-        )]))
+        )])
+        .into()
     }
 }

@@ -1,16 +1,21 @@
+use std::any::TypeId;
+
 use crate::{dep_map::ServiceMap, Config};
 
 pub mod beam;
 pub mod focus;
 
+pub type Deps<'a, T> = <<T as Service>::Inputs<'a> as ServiceTuple<'a>>::DepRefs;
+
 pub trait Service: ToCompose + 'static {
-    type Inputs: Service + 'static;
+    type Inputs<'s>: ServiceTuple<'s>;
 
-    fn from_config(conf: &Config, inputs: &mut Self::Inputs) -> Self
-    where
-        Self: Sized;
+    fn from_config(conf: &Config, deps: Deps<'_, Self>) -> Self;
 
-    fn make<'services>(conf: &Config, deps: &'services mut ServiceMap) -> &'services mut Self
+    fn get_or_create<'services>(
+        conf: &Config,
+        deps: &'services mut ServiceMap,
+    ) -> &'services mut Self
     where
         Self: Sized,
     {
@@ -19,65 +24,58 @@ pub trait Service: ToCompose + 'static {
         if deps.contains::<Self>() {
             return deps.get_mut().unwrap();
         }
-        let this = Self::from_config(conf, Self::Inputs::make(conf, deps));
+        let this = Self::from_config(conf, Self::Inputs::get_or_create(conf, deps));
         deps.insert(this);
         deps.get_mut().unwrap()
     }
 }
 
-impl Service for () {
-    type Inputs = ();
+pub trait ServiceTuple<'t> {
+    type DepRefs;
 
-    fn from_config(_conf: &Config, _inputs: &mut Self::Inputs) -> Self {
+    fn get_or_create<'service: 't>(
+        conf: &Config,
+        services: &'service mut ServiceMap,
+    ) -> Self::DepRefs;
+}
+
+impl<'t> ServiceTuple<'t> for () {
+    type DepRefs = ();
+
+    fn get_or_create<'service: 't>(_conf: &Config, _services: &'service mut ServiceMap) -> Self {
         ()
     }
+}
 
-    fn make<'a>(_conf: &Config, _deps: &'a mut ServiceMap) -> &'a mut Self
-    where
-        Self: Sized,
-    {
-        static mut THIS: () = ();
-        #[allow(static_mut_refs)]
+impl<'t, T: Service> ServiceTuple<'t> for (T,) {
+    type DepRefs = (&'t mut T,);
+
+    fn get_or_create<'service: 't>(
+        conf: &Config,
+        services: &'service mut ServiceMap,
+    ) -> Self::DepRefs {
+        (T::get_or_create(conf, services),)
+    }
+}
+
+impl<'t, T1: Service, T2: Service> ServiceTuple<'t> for (T1, T2) {
+    type DepRefs = (&'t mut T1, &'t mut T2);
+
+    fn get_or_create<'service: 't>(
+        conf: &Config,
+        services: &'service mut ServiceMap,
+    ) -> Self::DepRefs {
+        assert_ne!(TypeId::of::<T1>(), TypeId::of::<T2>());
+        // Safety:
+        // This is basically a HashMap::get_many_mut so as long as they don't overlap this code is
+        // sound
         unsafe {
-            &mut THIS
+            (
+                T1::get_or_create(conf, &mut *(services as *mut _)),
+                T2::get_or_create(conf, &mut *(services as *mut _)),
+            )
         }
     }
-}
-
-impl ToCompose for () {
-    fn to_compose(&self) -> serde_yaml::Value {
-        serde_yaml::Value::Null
-    }
-}
-
-// TODO: Think of something better for the tuples
-impl<T1: ToCompose, T2: ToCompose> ToCompose for (T1, T2) {
-    fn to_compose(&self) -> serde_yaml::Value {
-        serde_yaml::Value::Sequence(vec![self.0.to_compose(), self.1.to_compose()])
-    }
-}
-
-impl<T, T2> Service for (T, T2)
-where
-    T: Service,
-    T::Inputs: Service,
-    T2: Service,
-    T2::Inputs: Service,
-{
-    type Inputs = (T::Inputs, T2::Inputs);
-
-    fn from_config(conf: &Config, inputs: &mut Self::Inputs) -> Self {
-        (
-            T::from_config(conf, &mut inputs.0),
-            T2::from_config(conf, &mut inputs.1),
-        )
-    }
-}
-
-pub fn make_services<T: Service + 'static>(conf: &Config) -> ServiceMap {
-    let mut services = ServiceMap::default();
-    T::make(conf, &mut services);
-    services
 }
 
 pub trait ToCompose {

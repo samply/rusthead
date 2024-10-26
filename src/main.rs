@@ -1,12 +1,3 @@
-//! Options:
-//!
-//! 1:
-//! Express the whole config in terms of services which deserialize based on the toml config.
-//! In this version a service would be very specific like beam-proxy-ccp with a lot of defaults.
-//!
-//! 2:
-//! A service is an abstraction around a container and the Config is a hardcoded struct which gets deserialized and based on that we create these services programatically
-
 use serde::{Deserialize, Serialize};
 use services::{beam::DktkBroker, focus::Focus};
 use url::Url;
@@ -44,8 +35,9 @@ fn main() -> anyhow::Result<()> {
 
     match conf.project {
         Project::Ccp => {
-            let stuff = services::make_services::<Focus<DktkBroker>>(&conf);
-            println!("{}", serde_yaml::to_string(&stuff.to_compose()).unwrap());
+            let mut services = dep_map::ServiceMap::default();
+            services.install::<Focus<DktkBroker>>(&conf);
+            println!("{}", serde_yaml::to_string(&services.to_compose()).unwrap());
         }
         Project::Bbmri => todo!(),
         Project::Minimal => todo!(),

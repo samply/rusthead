@@ -5,18 +5,18 @@ use http::Uri;
 use crate::Config;
 
 use super::{
-    beam::{BeamProxy, BeamProxyKind},
-    Service, ToCompose,
+    beam::{BeamBrokerKind, BeamProxy},
+    Deps, Service, ToCompose,
 };
 
-pub struct Focus<T: BeamProxyKind> {
+pub struct Focus<T: BeamBrokerKind> {
     beam_id: String,
     beam_secret: String,
     beam_url: Uri,
     proxy: PhantomData<T>,
 }
 
-impl<T: BeamProxyKind> ToCompose for Focus<T> {
+impl<T: BeamBrokerKind> ToCompose for Focus<T> {
     #[rustfmt::skip]
     fn to_compose(&self) -> serde_yaml::Value {
         let Self { beam_id, beam_secret, beam_url, proxy: _ } = self;
@@ -31,10 +31,10 @@ impl<T: BeamProxyKind> ToCompose for Focus<T> {
     }
 }
 
-impl<T: BeamProxyKind + 'static> Service for Focus<T> {
-    type Inputs = BeamProxy<T>;
+impl<T: BeamBrokerKind + 'static> Service for Focus<T> {
+    type Inputs<'a> = (BeamProxy<T>,);
 
-    fn from_config(_conf: &Config, beam_proxy: &mut Self::Inputs) -> Self
+    fn from_config(_conf: &Config, (beam_proxy,): Deps<'_, Self>) -> Self
     where
         Self: Sized,
     {
