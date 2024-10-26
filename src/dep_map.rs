@@ -6,7 +6,7 @@ use std::{
 use crate::services::ToCompose;
 
 #[derive(Default)]
-pub struct ServiceMap(HashMap<TypeId, Box<dyn ToCompose>>);
+pub struct ServiceMap(pub(crate) HashMap<TypeId, Box<dyn ToCompose>>);
 
 impl std::fmt::Debug for ServiceMap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,6 +29,10 @@ impl ServiceMap {
 
     pub fn insert<T: ToCompose + Any>(&mut self, v: T) {
         self.0.insert(TypeId::of::<T>(), Box::new(v));
+    }
+
+    pub fn contains<T: ToCompose + Any>(&mut self) -> bool {
+        self.0.contains_key(&TypeId::of::<T>())
     }
 
     pub fn remove<T: ToCompose + Any>(&mut self) -> Option<T> {

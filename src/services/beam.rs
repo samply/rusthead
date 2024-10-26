@@ -35,7 +35,7 @@ impl<T: BeamProxyKind> BeamProxy<T> {
     }
 }
 
-impl<T: BeamProxyKind> Service for BeamProxy<T> {
+impl<T: BeamProxyKind + 'static> Service for BeamProxy<T> {
     type Inputs = ();
 
     fn from_config(conf: &Config, _: &mut Self::Inputs) -> Self {

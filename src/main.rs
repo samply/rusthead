@@ -7,7 +7,6 @@
 //! 2:
 //! A service is an abstraction around a container and the Config is a hardcoded struct which gets deserialized and based on that we create these services programatically
 
-use dep_map::ServiceMap;
 use serde::{Deserialize, Serialize};
 use services::{beam::DktkBroker, focus::Focus};
 use url::Url;
