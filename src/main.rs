@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use services::{beam::DktkBroker, focus::Focus};
 use url::Url;
 mod dep_map;
+mod modules;
 mod services;
 mod utils;
 
@@ -37,6 +38,11 @@ fn main() -> anyhow::Result<()> {
         Project::Ccp => {
             let mut services = dep_map::ServiceMap::default();
             services.install::<Focus<DktkBroker>>(&conf);
+            for &m in modules::CCP_MODULES {
+                if m.enabled(&conf) {
+                    m.install(&mut services, &conf);
+                }
+            }
             println!("{}", serde_yaml::to_string(&services.to_compose()).unwrap());
         }
         Project::Bbmri => todo!(),

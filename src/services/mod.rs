@@ -7,6 +7,7 @@ pub mod focus;
 
 pub type Deps<'a, T> = <<T as Service>::Inputs<'a> as ServiceTuple<'a>>::DepRefs;
 
+// Could remove 'static bound by using dtolnay's typeid crate for the type map
 pub trait Service: ToCompose + 'static {
     type Inputs<'s>: ServiceTuple<'s>;
 
