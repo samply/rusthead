@@ -1,25 +1,30 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, marker::PhantomData, str::FromStr};
 
 use http::Uri;
+use rinja::Template;
 
 use crate::{utils::generate_password, Config};
 
-use super::{Service, ToCompose};
+use super::Service;
 
-pub trait BeamBrokerKind {
+pub trait BeamBrokerKind: 'static {
     const BROKER_URL_STR: &str;
 
     fn broker_url() -> Uri {
         Uri::from_static(Self::BROKER_URL_STR)
     }
+
+    fn network_name() -> &'static str;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Template)]
+#[template(path = "beam.yml")]
 pub struct BeamProxy<T: BeamBrokerKind> {
     kind: PhantomData<T>,
     proxy_id: String,
     app_keys: HashMap<&'static str, String>,
 }
+
 impl<T: BeamBrokerKind> BeamProxy<T> {
     /// Returns (BeamAppId, BeamSecret)
     pub fn add_service(&mut self, service_name: &'static str) -> (String, String) {
@@ -31,11 +36,11 @@ impl<T: BeamBrokerKind> BeamProxy<T> {
     }
 
     pub fn get_url(&self) -> Uri {
-        Uri::from_static("http://beam-proxy")
+        Uri::from_str(&format!("http://{}", Self::service_name())).unwrap()
     }
 }
 
-impl<T: BeamBrokerKind + 'static> Service for BeamProxy<T> {
+impl<T: BeamBrokerKind> Service for BeamProxy<T> {
     type Inputs<'a> = ();
 
     fn from_config(conf: &Config, _: Self::Inputs<'_>) -> Self {
@@ -45,34 +50,18 @@ impl<T: BeamBrokerKind + 'static> Service for BeamProxy<T> {
             app_keys: Default::default(),
         }
     }
+
+    fn service_name() -> String {
+        format!("{}-beam-proxy", T::network_name())
+    }
 }
 
 pub struct DktkBroker;
 
 impl BeamBrokerKind for DktkBroker {
     const BROKER_URL_STR: &str = "https://asf.const";
-}
 
-pub type DktkBeamProxy = BeamProxy<DktkBroker>;
-
-impl<T: BeamBrokerKind> ToCompose for BeamProxy<T> {
-    #[rustfmt::skip]
-    fn to_compose(&self) -> serde_yaml::Value {
-        let Self { kind: _, proxy_id, app_keys } = self;
-        let broker_url = T::broker_url();
-        let mut yaml: serde_yaml::Value = serde_yaml::from_str(&format!(r###"
-        beam-proxy:
-          image: samply/beam-proxy
-          environment:
-            BROKER_URL: {broker_url}
-            PROXY_ID: {proxy_id}
-        "###
-        ))
-        .unwrap();
-        let envs = yaml["beam-proxy"]["environment"].as_mapping_mut().unwrap();
-        for (app_name, secret) in app_keys {
-            envs.insert(format!("APP_{app_name}_KEY").into(), secret.clone().into());
-        }
-        yaml
+    fn network_name() -> &'static str {
+        "ccp"
     }
 }

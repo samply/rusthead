@@ -1,0 +1,7 @@
+services:
+  {{ Self::service_name() }}:
+    image: samply/focus
+    environment:
+      BEAM_ID: {{ beam_id }}
+      BEAM_URL: {{ beam_url }}
+      BEAM_SECRET: "{{ beam_secret }}"
