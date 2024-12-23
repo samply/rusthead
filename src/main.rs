@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
                     m.install(&mut services, &conf);
                 }
             }
-            println!("{}", serde_yaml::to_string(&services.to_compose()).unwrap());
+            services.write_composables()?
         }
         Project::Bbmri => todo!(),
         Project::Minimal => todo!(),

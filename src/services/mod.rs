@@ -1,5 +1,8 @@
 use std::any::TypeId;
 
+use anyhow::Context;
+use rinja::Template;
+
 use crate::{dep_map::ServiceMap, Config};
 
 pub mod beam;
@@ -12,6 +15,8 @@ pub trait Service: ToCompose + 'static {
     type Inputs<'s>: ServiceTuple<'s>;
 
     fn from_config(conf: &Config, deps: Deps<'_, Self>) -> Self;
+
+    fn service_name() -> String;
 
     fn get_or_create<'services>(
         conf: &Config,
@@ -80,7 +85,18 @@ impl<'t, T1: Service, T2: Service> ServiceTuple<'t> for (T1, T2) {
 }
 
 pub trait ToCompose {
-    // TODO: Always quote secrets but just replace this with jinja templates
-    // Acutal issue is $ in pws
-    fn to_compose(&self) -> serde_yaml::Value;
+    fn render(&self) -> anyhow::Result<String>;
+
+    fn service_name(&self) -> String;
+}
+
+impl<T: Template + Service> ToCompose for T {
+    fn render(&self) -> anyhow::Result<String> {
+        Template::render(self)
+            .with_context(|| format!("Failed to render {}", std::any::type_name::<T>()))
+    }
+
+    fn service_name(&self) -> String {
+        <T as Service>::service_name()
+    }
 }

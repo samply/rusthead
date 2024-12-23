@@ -1,6 +1,7 @@
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
+    fs,
 };
 
 use crate::{
@@ -9,7 +10,6 @@ use crate::{
 };
 
 #[derive(Default)]
-// TODO: Change this to a indexmap to preserve order so that diffs between config changes look nicer
 pub struct ServiceMap(HashMap<TypeId, Box<dyn ToCompose>>);
 
 impl std::fmt::Debug for ServiceMap {
@@ -38,20 +38,14 @@ impl ServiceMap {
         self.get_mut().unwrap()
     }
 
-    pub fn to_compose(&self) -> serde_yaml::Value {
-        serde_yaml::Mapping::from_iter([(
-            "services".into(),
-            serde_yaml::Value::Mapping(self.0.iter().fold(
-                serde_yaml::Mapping::new(),
-                |mut acc, (_, v)| {
-                    match v.to_compose() {
-                        serde_yaml::Value::Mapping(m) => acc.extend(m),
-                        what => panic!("Service did not return a mapping: {what:?}"),
-                    };
-                    acc
-                },
-            )),
-        )])
-        .into()
+    pub fn write_composables(&self) -> anyhow::Result<()> {
+        fs::create_dir_all("services")?;
+        for service in self.0.values() {
+            fs::write(
+                format!("services/{}.yml", service.service_name()),
+                service.render()?,
+            )?;
+        }
+        Ok(())
     }
 }
