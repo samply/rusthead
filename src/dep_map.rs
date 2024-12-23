@@ -9,7 +9,8 @@ use crate::{
 };
 
 #[derive(Default)]
-pub struct ServiceMap(pub(crate) HashMap<TypeId, Box<dyn ToCompose>>);
+// TODO: Change this to a indexmap to preserve order so that diffs between config changes look nicer
+pub struct ServiceMap(HashMap<TypeId, Box<dyn ToCompose>>);
 
 impl std::fmt::Debug for ServiceMap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -32,8 +33,9 @@ impl ServiceMap {
         self.0.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn install<T: Service>(&mut self, conf: &Config) {
+    pub fn install<T: Service>(&mut self, conf: &Config) -> &mut T {
         T::get_or_create(conf, self);
+        self.get_mut().unwrap()
     }
 
     pub fn to_compose(&self) -> serde_yaml::Value {
