@@ -12,6 +12,16 @@ pub trait Module {
     fn install(&self, service_map: &mut ServiceMap, conf: &Config);
 }
 
+impl Module for &dyn Module {
+    fn enabled(&self, conf: &Config) -> bool {
+        (*self).enabled(conf)
+    }
+
+    fn install(&self, service_map: &mut ServiceMap, conf: &Config) {
+        (*self).install(service_map, conf);
+    }
+}
+
 struct ExampleModule<T: BeamBrokerKind>(PhantomData<T>);
 
 impl<T: BeamBrokerKind> ExampleModule<T> {
@@ -20,7 +30,7 @@ impl<T: BeamBrokerKind> ExampleModule<T> {
     }
 }
 
-impl<T: BeamBrokerKind + 'static> Module for ExampleModule<T> {
+impl<T: BeamBrokerKind> Module for ExampleModule<T> {
     fn enabled(&self, _conf: &Config) -> bool {
         true
     }

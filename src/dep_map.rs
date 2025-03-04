@@ -5,6 +5,7 @@ use std::{
 };
 
 use crate::{
+    modules::Module,
     services::{Service, ToCompose},
     Config,
 };
@@ -36,6 +37,12 @@ impl ServiceMap {
     pub fn install<T: Service>(&mut self, conf: &Config) -> &mut T {
         T::get_or_create(conf, self);
         self.get_mut().unwrap()
+    }
+
+    pub fn install_module<M: Module>(&mut self, m: M, conf: &Config) {
+        if m.enabled(conf) {
+            m.install(self, conf);
+        }
     }
 
     pub fn write_composables(&self) -> anyhow::Result<()> {

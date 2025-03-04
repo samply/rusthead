@@ -34,15 +34,13 @@ fn main() -> anyhow::Result<()> {
         site_id: "test".into(),
     };
 
+    let mut services = dep_map::ServiceMap::default();
     match conf.project {
         Project::Ccp => {
-            let mut services = dep_map::ServiceMap::default();
             services.install::<Focus<DktkBroker>>(&conf);
-            for &m in modules::CCP_MODULES {
-                if m.enabled(&conf) {
-                    m.install(&mut services, &conf);
-                }
-            }
+            modules::CCP_MODULES
+                .iter()
+                .for_each(|&m| services.install_module(m, &conf));
             services.write_composables()?
         }
         Project::Bbmri => todo!(),
