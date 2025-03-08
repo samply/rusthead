@@ -8,12 +8,7 @@ use crate::{utils::generate_password, Config};
 use super::Service;
 
 pub trait BeamBrokerKind: 'static {
-    const BROKER_URL_STR: &str;
-
-    fn broker_url() -> Uri {
-        Uri::from_static(Self::BROKER_URL_STR)
-    }
-
+    fn broker_url() -> Uri;
     fn network_name() -> &'static str;
 }
 
@@ -59,9 +54,11 @@ impl<T: BeamBrokerKind> Service for BeamProxy<T> {
 pub struct DktkBroker;
 
 impl BeamBrokerKind for DktkBroker {
-    const BROKER_URL_STR: &str = "https://asf.const";
-
     fn network_name() -> &'static str {
         "ccp"
+    }
+
+    fn broker_url() -> Uri {
+        Uri::from_static("https://broker.example.com")
     }
 }

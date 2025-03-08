@@ -45,44 +45,38 @@ pub trait ServiceTuple<'t> {
     ) -> Self::DepRefs;
 }
 
-impl<'t> ServiceTuple<'t> for () {
-    type DepRefs = ();
+macro_rules! service_tuple {
+    ($($ts:ident),*) => {
+        impl<'t, $($ts: Service,)*> ServiceTuple<'t> for ($($ts,)*) {
+            type DepRefs = ($(&'t mut $ts,)*);
 
-    fn get_or_create<'service: 't>(_conf: &Config, _services: &'service mut ServiceMap) -> Self {
-        ()
-    }
-}
-
-impl<'t, T: Service> ServiceTuple<'t> for (T,) {
-    type DepRefs = (&'t mut T,);
-
-    fn get_or_create<'service: 't>(
-        conf: &Config,
-        services: &'service mut ServiceMap,
-    ) -> Self::DepRefs {
-        (T::get_or_create(conf, services),)
-    }
-}
-
-impl<'t, T1: Service, T2: Service> ServiceTuple<'t> for (T1, T2) {
-    type DepRefs = (&'t mut T1, &'t mut T2);
-
-    fn get_or_create<'service: 't>(
-        conf: &Config,
-        services: &'service mut ServiceMap,
-    ) -> Self::DepRefs {
-        assert_ne!(TypeId::of::<T1>(), TypeId::of::<T2>());
-        // Safety:
-        // This is basically a HashMap::get_many_mut so as long as they don't overlap this code is
-        // sound
-        unsafe {
-            (
-                T1::get_or_create(conf, &mut *(services as *mut _)),
-                T2::get_or_create(conf, &mut *(services as *mut _)),
-            )
+            #[allow(unused)]
+            fn get_or_create<'service: 't>(
+                conf: &Config,
+                services: &'service mut ServiceMap,
+            ) -> Self::DepRefs {
+                let mut type_ids: Vec<TypeId> = vec![$(TypeId::of::<$ts>()),*];
+                let n = type_ids.len();
+                type_ids.dedup();
+                assert_eq!(n, type_ids.len(), "Service tuple needs to be disjoint");
+                // Safety:
+                // This is basically a HashMap::get_many_mut so as long as the types don't overlap,
+                // which we check above, this code is sound
+                unsafe {
+                    ($(
+                        $ts::get_or_create(conf, &mut *(services as *mut _)),
+                    )*)
+                }
+            }
         }
-    }
+    };
 }
+
+service_tuple!();
+service_tuple!(T1);
+service_tuple!(T1, T2);
+service_tuple!(T1, T2, T3);
+service_tuple!(T1, T2, T3, T4);
 
 pub trait ToCompose {
     fn render(&self) -> anyhow::Result<String>;
