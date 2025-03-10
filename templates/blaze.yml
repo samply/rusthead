@@ -1,0 +1,10 @@
+services:
+  {{ Self::service_name() }}:
+    image: docker.verbis.dkfz.de/cache/samply/blaze:latest
+    environment:
+      BASE_URL: {{ get_url() }}
+    volumes:
+      - "{{ Self::service_name() }}-data:/app/data"
+  
+volumes:
+  {{ Self::service_name() }}-data:

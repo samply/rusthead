@@ -2,6 +2,9 @@ services:
   {{ Self::service_name() }}:
     image: samply/focus
     environment:
-      BEAM_ID: {{ beam_id }}
+      BEAM_APP_ID_LONG: {{ beam_id }}
       BEAM_URL: {{ beam_url }}
-      BEAM_SECRET: "{{ beam_secret }}"
+      BLAZE_URL: {{ blaze_url }}fhir/
+      API_KEY: "{{ beam_secret }}"
+      RETRY_COUNT: 128
+      EPSILON: 0.28

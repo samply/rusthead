@@ -1,6 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData, str::FromStr};
 
-use http::Uri;
+use url::Url;
 use rinja::Template;
 
 use crate::{utils::generate_password, Config};
@@ -8,7 +8,7 @@ use crate::{utils::generate_password, Config};
 use super::Service;
 
 pub trait BeamBrokerKind: 'static {
-    fn broker_url() -> Uri;
+    fn broker_url() -> Url;
     fn network_name() -> &'static str;
 }
 
@@ -30,8 +30,8 @@ impl<T: BeamBrokerKind> BeamProxy<T> {
         (format!("{service_name}.{}", self.proxy_id), secret.clone())
     }
 
-    pub fn get_url(&self) -> Uri {
-        Uri::from_str(&format!("http://{}", Self::service_name())).unwrap()
+    pub fn get_url(&self) -> Url {
+        Url::from_str(&format!("http://{}", Self::service_name())).unwrap()
     }
 }
 
@@ -58,7 +58,7 @@ impl BeamBrokerKind for DktkBroker {
         "ccp"
     }
 
-    fn broker_url() -> Uri {
-        Uri::from_static("https://broker.example.com")
+    fn broker_url() -> Url {
+        Url::from_str("https://broker.example.com").unwrap()
     }
 }

@@ -7,6 +7,7 @@ use crate::{dep_map::ServiceMap, Config};
 
 pub mod beam;
 pub mod focus;
+pub mod blaze;
 
 pub type Deps<'a, T> = <<T as Service>::Inputs<'a> as ServiceTuple<'a>>::DepRefs;
 
