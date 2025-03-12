@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use serde::Deserialize;
-use services::{beam::DktkBroker, focus::Focus};
 use url::Url;
 mod dep_map;
 mod modules;
@@ -34,8 +33,7 @@ fn main() -> anyhow::Result<()> {
     let conf: Config = toml::from_str(&std::fs::read_to_string(conf_path)?)?;
 
     let mut services = dep_map::ServiceMap::default();
-    services.install::<Focus<DktkBroker>>(&conf);
-    modules::CCP_MODULES
+    modules::MODULES
         .iter()
         .for_each(|&m| services.install_module(m, &conf));
     services.write_composables()?;
