@@ -19,7 +19,7 @@ impl<For> Blaze<For> where Self: Service {
 }
 
 impl<For: Service> Service for Blaze<For> {
-    type Inputs<'s> = ();
+    type Dependencies<'s> = ();
 
     fn from_config(_conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
         Self { r#for: PhantomData }
@@ -31,7 +31,7 @@ impl<For: Service> Service for Blaze<For> {
 }
 
 impl Service for Blaze<()> {
-    type Inputs<'s> = ();
+    type Dependencies<'s> = ();
 
     fn from_config(_conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
         Self { r#for: PhantomData }

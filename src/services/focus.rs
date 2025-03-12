@@ -20,7 +20,7 @@ pub struct Focus<T: BeamBrokerKind> {
 }
 
 impl<T: BeamBrokerKind> Service for Focus<T> {
-    type Inputs<'a> = (BeamProxy<T>, Blaze<Self>);
+    type Dependencies<'a> = (BeamProxy<T>, Blaze<Self>);
 
     fn from_config(_conf: &Config, (beam_proxy, blaze): Deps<'_, Self>) -> Self
     where

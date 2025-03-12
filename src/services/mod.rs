@@ -9,11 +9,11 @@ pub mod beam;
 pub mod focus;
 pub mod blaze;
 
-pub type Deps<'a, T> = <<T as Service>::Inputs<'a> as ServiceTuple<'a>>::DepRefs;
+pub type Deps<'a, T> = <<T as Service>::Dependencies<'a> as ServiceTuple<'a>>::DepRefs;
 
 // Could remove 'static bound by using dtolnay's typeid crate for the type map
 pub trait Service: ToCompose + 'static {
-    type Inputs<'s>: ServiceTuple<'s>;
+    type Dependencies<'s>: ServiceTuple<'s>;
 
     fn from_config(conf: &Config, deps: Deps<'_, Self>) -> Self;
 
@@ -31,7 +31,7 @@ pub trait Service: ToCompose + 'static {
         if deps.contains::<Self>() {
             return deps.get_mut().unwrap();
         }
-        let this = Self::from_config(conf, Self::Inputs::get_or_create(conf, deps));
+        let this = Self::from_config(conf, Self::Dependencies::get_or_create(conf, deps));
         deps.insert(this);
         deps.get_mut().unwrap()
     }

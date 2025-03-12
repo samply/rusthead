@@ -36,9 +36,9 @@ impl<T: BeamBrokerKind> BeamProxy<T> {
 }
 
 impl<T: BeamBrokerKind> Service for BeamProxy<T> {
-    type Inputs<'a> = ();
+    type Dependencies<'a> = ();
 
-    fn from_config(conf: &Config, _: Self::Inputs<'_>) -> Self {
+    fn from_config(conf: &Config, _: Self::Dependencies<'_>) -> Self {
         BeamProxy {
             kind: PhantomData,
             proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
