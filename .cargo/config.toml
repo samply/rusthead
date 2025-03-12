@@ -1,0 +1,2 @@
+[env]
+CONFIG_PATH = "./example.toml"
