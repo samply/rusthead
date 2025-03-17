@@ -8,6 +8,7 @@ use crate::{dep_map::ServiceMap, Config};
 pub mod beam;
 pub mod focus;
 pub mod blaze;
+pub mod traefik;
 
 pub type Deps<'a, T> = <<T as Service>::Dependencies<'a> as ServiceTuple<'a>>::DepRefs;
 
