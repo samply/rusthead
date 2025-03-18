@@ -20,7 +20,7 @@ where
     Self: Service,
 {
     pub fn get_url(&self) -> Url {
-        Url::from_str(&format!("http://{}:8080", Self::balze_service_name())).unwrap()
+        Url::from_str(&format!("http://{}:8080", Self::service_name())).unwrap()
     }
 }
 

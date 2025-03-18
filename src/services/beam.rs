@@ -33,7 +33,7 @@ impl<T: BrokerProvider> BeamProxy<T> {
     }
 
     pub fn get_url(&self) -> Url {
-        Url::from_str(&format!("http://{}", Self::service_name())).unwrap()
+        Url::from_str(&format!("http://{}:8081", Self::service_name())).unwrap()
     }
 }
 

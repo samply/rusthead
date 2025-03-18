@@ -21,6 +21,7 @@ where
     beam_secret: String,
     beam_url: Url,
     blaze_url: Url,
+    endpoint_type: String,
     beam_and_blaze: PhantomData<(Beam, Backend)>,
 }
 
@@ -38,6 +39,7 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
             beam_secret,
             beam_url: beam_proxy.get_url(),
             blaze_url: blaze.get_url(),
+            endpoint_type: "blaze".into()
         }
     }
 

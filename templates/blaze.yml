@@ -3,7 +3,8 @@ services:
   {{ name }}:
     image: docker.verbis.dkfz.de/cache/samply/blaze:latest
     environment:
-      BASE_URL: {{ get_url() }}
+      BASE_URL: {{ get_url().to_string().trim_end_matches('/') }}
+      ENFORCE_REFERENTIAL_INTEGRITY: "false"
     volumes:
       - "{{ name }}-data:/app/data"
     {% if let Some(traefik_conf) = traefik_conf -%}
