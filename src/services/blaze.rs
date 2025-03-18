@@ -27,12 +27,11 @@ where
 impl<T: BlazeProvider> Service for Blaze<T> {
     type Dependencies<'s> = (Traefik,);
 
-    fn from_config(_conf: &crate::Config, (_traefik,): super::Deps<'_, Self>) -> Self {
+    fn from_config(_conf: &crate::Config, (traefik,): super::Deps<'_, Self>) -> Self {
         let traefik_conf = T::treafik_exposure();
-        // TODO:
-        // if let Some(conf) = traefik_conf {
-        //     traefik.add_basic_auth_user(conf.user)
-        // }
+        if let Some(conf) = &traefik_conf {
+            traefik.add_basic_auth_user(conf.middleware_and_user_name.clone())
+        }
         Self {
             r#for: PhantomData,
             traefik_conf,
@@ -56,7 +55,7 @@ pub trait BlazeProvider: 'static {
 #[derive(Debug)]
 pub struct BlazeTraefikConfig {
     pub path: String,
-    pub user: String,
+    pub middleware_and_user_name: String,
 }
 
 impl<T: Service> BlazeProvider for T {

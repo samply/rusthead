@@ -11,20 +11,27 @@ services:
       - --accesslog=true
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --tls.stores.default.defaultCertificate.certFile=/certs/fullchain.pem
-      - --tls.stores.default.defaultCertificate.keyFile=/certs/privpem.pem
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=PathPrefix(`/dashboard/`)"
-      - "traefik.http.routers.dashboard.entrypoints=websecure"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.tls=true"
-      # TODO:
-      # - "traefik.http.routers.dashboard.middlewares=auth"
-      # - "traefik.http.middlewares.auth.basicauth.users=${LDM_AUTH}"
+      {% for (middleware, encoded_auth) in basic_auth_users -%}
+        - "traefik.http.middlewares.{{ middleware }}.basicauth.users={{ middleware }}:{{ encoded_auth }}"
+      {%- endfor %}
     ports:
       - 80:80
       - 443:443
+    configs:
+      - source: certificates.yaml
+        target: /configuration/certificates.yaml
     volumes:
       - {{ tls_dir.as_path().display() }}:/certs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+
+configs:
+  certificates.yaml:
+    content: |
+      tls:
+        stores:
+          default:
+            defaultCertificate:
+              certFile: /certs/fullchain.pem
+              keyFile: /certs/privkey.pem

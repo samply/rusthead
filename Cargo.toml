@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
+bcrypt = "0.17.0"
 rand = "0.9"
 rinja = { version = "0.3", default-features = false }
 serde = { version = "1", features = ["derive"] }

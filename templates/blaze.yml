@@ -12,7 +12,7 @@ services:
       - "traefik.http.routers.{{ name }}.rule=PathPrefix(`{{ traefik_conf.path }}`)"
       - "traefik.http.middlewares.{{ name }}_strip.stripprefix.prefixes={{ traefik_conf.path }}"
       - "traefik.http.services.{{ name }}.loadbalancer.server.port=8080"
-      - "traefik.http.routers.{{ name }}.middlewares={{ name }}_strip,blaze"
+      - "traefik.http.routers.{{ name }}.middlewares={{ name }}_strip,{{ traefik_conf.middleware_and_user_name }}"
       - "traefik.http.routers.{{ name }}.tls=true"
     {%- endif %}
   
