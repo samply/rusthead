@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use url::Url;
 
-use crate::services::{Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus};
+use crate::services::{Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, ServiceMap};
 
 use super::Module;
 
@@ -14,7 +14,7 @@ impl Module for CcpDefault {
         conf.ccp.is_some()
     }
 
-    fn install(&self, service_map: &mut crate::dep_map::ServiceMap, conf: &crate::Config) {
+    fn install(&self, service_map: &mut ServiceMap, conf: &crate::Config) {
         service_map.install::<Focus<Self, Blaze<Self>>>(conf);
     }
 }
@@ -38,6 +38,10 @@ impl BrokerProvider for CcpDefault {
     }
 
     fn broker_url() -> Url {
-        Url::from_str("https://broker.example.com").unwrap()
+        Url::from_str("https://broker.ccp-it.dktk.dkfz.de").unwrap()
+    }
+
+    fn root_cert() -> &'static str {
+        include_str!("../../static/ccp.root.crt.pem")
     }
 }

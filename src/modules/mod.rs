@@ -1,8 +1,7 @@
 mod ccp;
 
 use crate::{
-    dep_map::ServiceMap,
-    Config,
+    services::ServiceMap, Config
 };
 
 pub trait Module {

@@ -1,9 +1,9 @@
-use std::any::TypeId;
+use std::{any::{Any, TypeId}, collections::HashMap, fs, path::Path};
 
 use anyhow::Context;
 use rinja::Template;
 
-use crate::{dep_map::ServiceMap, Config};
+use crate::{modules::Module, Config};
 
 mod beam;
 pub use beam::*;
@@ -98,5 +98,52 @@ impl<T: Template + Service> ToCompose for T {
 
     fn service_name(&self) -> String {
         <T as Service>::service_name()
+    }
+}
+
+#[derive(Default)]
+pub struct ServiceMap(HashMap<TypeId, Box<dyn ToCompose>>);
+
+impl std::fmt::Debug for ServiceMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.0.keys()).finish()
+    }
+}
+
+impl ServiceMap {
+    pub fn get_mut<T: ToCompose + Any>(&mut self) -> Option<&mut T> {
+        self.0
+            .get_mut(&TypeId::of::<T>())
+            .map(|v| unsafe { &mut *(v.as_mut() as *mut dyn ToCompose as *mut T) })
+    }
+
+    pub fn insert<T: ToCompose + Any>(&mut self, v: T) {
+        self.0.insert(TypeId::of::<T>(), Box::new(v));
+    }
+
+    pub fn contains<T: ToCompose + Any>(&self) -> bool {
+        self.0.contains_key(&TypeId::of::<T>())
+    }
+
+    pub fn install<T: Service>(&mut self, conf: &Config) -> &mut T {
+        T::get_or_create(conf, self)
+    }
+
+    pub fn install_module<M: Module>(&mut self, m: M, conf: &Config) {
+        if m.enabled(conf) {
+            m.install(self, conf);
+        }
+    }
+
+    pub fn write_composables(&self, srv_dir: impl AsRef<Path>) -> anyhow::Result<()> {
+        let services_dir = srv_dir.as_ref().join("services");
+        fs::create_dir_all(&services_dir)?;
+        for service in self.0.values() {
+            fs::write(
+                services_dir.join(format!("{}.yml", service.service_name())),
+                service.render()?,
+            )?;
+        }
+        Ok(())
     }
 }

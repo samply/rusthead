@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData, str::FromStr};
+use std::{collections::HashMap, marker::PhantomData, path::PathBuf, str::FromStr};
 
 use url::Url;
 use rinja::Template;
@@ -10,13 +10,15 @@ use super::Service;
 pub trait BrokerProvider: 'static {
     fn broker_url() -> Url;
     fn network_name() -> &'static str;
+    fn root_cert() -> &'static str;
 }
 
 #[derive(Debug, Template)]
 #[template(path = "beam.yml")]
 pub struct BeamProxy<T: BrokerProvider> {
-    kind: PhantomData<T>,
+    broker_provider: PhantomData<T>,
     proxy_id: String,
+    priv_key: PathBuf,
     app_keys: HashMap<&'static str, String>,
 }
 
@@ -40,7 +42,8 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
 
     fn from_config(conf: &Config, _: Self::Dependencies<'_>) -> Self {
         BeamProxy {
-            kind: PhantomData,
+            broker_provider: PhantomData,
+            priv_key: conf.path.join(format!("pki/{}.priv.pem", conf.site_id)),
             proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
             app_keys: Default::default(),
         }

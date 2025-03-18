@@ -1,0 +1,11 @@
+# Copy this file to /etc/bridgehead/config.toml
+
+site_id = "dummy"
+# https_proxy = "http://dummy:8080"
+# http_proxy = "http://dummy:8080"
+# Default value
+# srv_dir = "/srv/docker/bridgehead" # For dev purposes set this to .
+
+[ccp]
+
+[bbmri]

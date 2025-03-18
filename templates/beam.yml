@@ -1,9 +1,25 @@
 services:
   {{ Self::service_name() }}:
-    image: samply/beam-proxy
+    image: docker.verbis.dkfz.de/cache/samply/beam-proxy:develop
     environment:
       BROKER_URL: {{ T::broker_url() }}
       PROXY_ID: {{ proxy_id }}
       {% for (app_name, secret) in app_keys -%}
         APP_{{ app_name }}_KEY: "{{secret}}"
-      {% endfor %}
+      {% endfor -%}
+      ROOTCERT_FILE: /conf/root.crt.pem
+      PRIVKEY_FILE: /run/secrets/proxy.pem
+    secrets:
+      - proxy.pem
+    configs:
+      - source: root.crt.pem
+        target: /conf/root.crt.pem
+
+configs:
+  root.crt.pem:
+    content: |
+      {{ T::root_cert()|indent(6) }}
+
+secrets:
+  proxy.pem:
+    file: {{ priv_key.canonicalize()?.as_path().display() }}
