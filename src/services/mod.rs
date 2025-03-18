@@ -5,10 +5,14 @@ use rinja::Template;
 
 use crate::{dep_map::ServiceMap, Config};
 
-pub mod beam;
-pub mod focus;
-pub mod blaze;
-pub mod traefik;
+mod beam;
+pub use beam::*;
+mod focus;
+pub use focus::*;
+mod blaze;
+pub use blaze::*;
+mod traefik;
+pub use traefik::*;
 
 pub type Deps<'a, T> = <<T as Service>::Dependencies<'a> as ServiceTuple<'a>>::DepRefs;
 

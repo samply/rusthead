@@ -7,20 +7,20 @@ use crate::{utils::generate_password, Config};
 
 use super::Service;
 
-pub trait BeamBrokerKind: 'static {
+pub trait BrokerProvider: 'static {
     fn broker_url() -> Url;
     fn network_name() -> &'static str;
 }
 
 #[derive(Debug, Template)]
 #[template(path = "beam.yml")]
-pub struct BeamProxy<T: BeamBrokerKind> {
+pub struct BeamProxy<T: BrokerProvider> {
     kind: PhantomData<T>,
     proxy_id: String,
     app_keys: HashMap<&'static str, String>,
 }
 
-impl<T: BeamBrokerKind> BeamProxy<T> {
+impl<T: BrokerProvider> BeamProxy<T> {
     /// Returns (BeamAppId, BeamSecret)
     pub fn add_service(&mut self, service_name: &'static str) -> (String, String) {
         let secret = self
@@ -35,7 +35,7 @@ impl<T: BeamBrokerKind> BeamProxy<T> {
     }
 }
 
-impl<T: BeamBrokerKind> Service for BeamProxy<T> {
+impl<T: BrokerProvider> Service for BeamProxy<T> {
     type Dependencies<'a> = ();
 
     fn from_config(conf: &Config, _: Self::Dependencies<'_>) -> Self {
@@ -48,17 +48,5 @@ impl<T: BeamBrokerKind> Service for BeamProxy<T> {
 
     fn service_name() -> String {
         format!("{}-beam-proxy", T::network_name())
-    }
-}
-
-pub struct DktkBroker;
-
-impl BeamBrokerKind for DktkBroker {
-    fn network_name() -> &'static str {
-        "ccp"
-    }
-
-    fn broker_url() -> Url {
-        Url::from_str("https://broker.example.com").unwrap()
     }
 }

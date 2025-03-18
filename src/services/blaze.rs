@@ -3,41 +3,56 @@ use std::{marker::PhantomData, str::FromStr};
 use rinja::Template;
 use url::Url;
 
-use super::Service;
+use super::{Traefik, Service};
 
 
 #[derive(Debug, Template)]
 #[template(path = "blaze.yml")]
-pub struct Blaze<For> where Self: Service {
-    r#for: PhantomData<For>,
+pub struct Blaze<T> where Self: Service {
+    r#for: PhantomData<T>,
+    traefik_conf: Option<BlazeTraefikConfig>,
 }
 
-impl<For> Blaze<For> where Self: Service {
+impl<T> Blaze<T> where Self: Service {
     pub fn get_url(&self) -> Url {
-        Url::from_str(&format!("http://{}:8080", Self::service_name())).unwrap()
+        Url::from_str(&format!("http://{}:8080", Self::balze_service_name())).unwrap()
     }
 }
 
-impl<For: Service> Service for Blaze<For> {
-    type Dependencies<'s> = ();
+impl<T: BlazeProvider> Service for Blaze<T> {
+    type Dependencies<'s> = (Traefik, );
 
-    fn from_config(_conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
-        Self { r#for: PhantomData }
+    fn from_config(_conf: &crate::Config, (_traefik,): super::Deps<'_, Self>) -> Self {
+        let traefik_conf = T::treafik_exposure();
+        // TODO:
+        // if let Some(conf) = traefik_conf {
+        //     traefik.add_basic_auth_user(conf.user)
+        // }
+        Self { r#for: PhantomData, traefik_conf }
     }
 
     fn service_name() -> String {
-        format!("{}-blaze", <For as Service>::service_name())
+        T::balze_service_name()
     }
 }
 
-impl Service for Blaze<()> {
-    type Dependencies<'s> = ();
+pub trait BlazeProvider: 'static {
+    fn balze_service_name() -> String;
 
-    fn from_config(_conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
-        Self { r#for: PhantomData }
+    /// relative path where this balze should be exposed thorugh traefik. Defaults to None
+    fn treafik_exposure() -> Option<BlazeTraefikConfig> {
+        None
     }
+}
 
-    fn service_name() -> String {
-        "blaze".into()
+#[derive(Debug)]
+pub struct BlazeTraefikConfig {
+    pub path: String,
+    pub user: String,
+}
+
+impl<T: Service> BlazeProvider for T {
+    fn balze_service_name() -> String {
+        format!("{}-blaze", <T as Service>::service_name())
     }
 }

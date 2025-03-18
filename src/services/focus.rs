@@ -6,21 +6,21 @@ use url::Url;
 use crate::Config;
 
 use super::{
-    beam::{BeamBrokerKind, BeamProxy}, blaze::Blaze, Deps, Service
+    beam::{BrokerProvider, BeamProxy}, blaze::{Blaze, BlazeProvider}, Deps, Service
 };
 
 #[derive(Debug, Template)]
 #[template(path = "focus.yml")]
-pub struct Focus<T: BeamBrokerKind> {
+pub struct Focus<Beam: BrokerProvider, Backend> where Self: Service {
     beam_id: String,
     beam_secret: String,
     beam_url: Url,
     blaze_url: Url,
-    proxy: PhantomData<T>,
+    beam_and_blaze: PhantomData<(Beam, Backend)>,
 }
 
-impl<T: BeamBrokerKind> Service for Focus<T> {
-    type Dependencies<'a> = (BeamProxy<T>, Blaze<Self>);
+impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
+    type Dependencies<'a> = (BeamProxy<T>, Blaze<B>);
 
     fn from_config(_conf: &Config, (beam_proxy, blaze): Deps<'_, Self>) -> Self
     where
@@ -28,7 +28,7 @@ impl<T: BeamBrokerKind> Service for Focus<T> {
     {
         let (beam_id, beam_secret) = beam_proxy.add_service("focus");
         Focus {
-            proxy: PhantomData,
+            beam_and_blaze: PhantomData,
             beam_id,
             beam_secret,
             beam_url: beam_proxy.get_url(),
