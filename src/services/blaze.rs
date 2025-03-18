@@ -3,24 +3,29 @@ use std::{marker::PhantomData, str::FromStr};
 use rinja::Template;
 use url::Url;
 
-use super::{Traefik, Service};
-
+use super::{Service, Traefik};
 
 #[derive(Debug, Template)]
 #[template(path = "blaze.yml")]
-pub struct Blaze<T> where Self: Service {
+pub struct Blaze<T>
+where
+    Self: Service,
+{
     r#for: PhantomData<T>,
     traefik_conf: Option<BlazeTraefikConfig>,
 }
 
-impl<T> Blaze<T> where Self: Service {
+impl<T> Blaze<T>
+where
+    Self: Service,
+{
     pub fn get_url(&self) -> Url {
         Url::from_str(&format!("http://{}:8080", Self::balze_service_name())).unwrap()
     }
 }
 
 impl<T: BlazeProvider> Service for Blaze<T> {
-    type Dependencies<'s> = (Traefik, );
+    type Dependencies<'s> = (Traefik,);
 
     fn from_config(_conf: &crate::Config, (_traefik,): super::Deps<'_, Self>) -> Self {
         let traefik_conf = T::treafik_exposure();
@@ -28,7 +33,10 @@ impl<T: BlazeProvider> Service for Blaze<T> {
         // if let Some(conf) = traefik_conf {
         //     traefik.add_basic_auth_user(conf.user)
         // }
-        Self { r#for: PhantomData, traefik_conf }
+        Self {
+            r#for: PhantomData,
+            traefik_conf,
+        }
     }
 
     fn service_name() -> String {

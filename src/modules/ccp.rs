@@ -2,10 +2,11 @@ use std::str::FromStr;
 
 use url::Url;
 
-use crate::services::{Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, ServiceMap};
+use crate::services::{
+    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, ServiceMap,
+};
 
 use super::Module;
-
 
 pub struct CcpDefault;
 

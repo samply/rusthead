@@ -6,12 +6,17 @@ use url::Url;
 use crate::Config;
 
 use super::{
-    beam::{BrokerProvider, BeamProxy}, blaze::{Blaze, BlazeProvider}, Deps, Service
+    beam::{BeamProxy, BrokerProvider},
+    blaze::{Blaze, BlazeProvider},
+    Deps, Service,
 };
 
 #[derive(Debug, Template)]
 #[template(path = "focus.yml")]
-pub struct Focus<Beam: BrokerProvider, Backend> where Self: Service {
+pub struct Focus<Beam: BrokerProvider, Backend>
+where
+    Self: Service,
+{
     beam_id: String,
     beam_secret: String,
     beam_url: Url,

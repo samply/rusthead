@@ -1,8 +1,6 @@
 mod ccp;
 
-use crate::{
-    services::ServiceMap, Config
-};
+use crate::{services::ServiceMap, Config};
 
 pub trait Module {
     fn enabled(&self, conf: &Config) -> bool;

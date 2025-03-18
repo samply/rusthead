@@ -1,4 +1,9 @@
-use std::{any::{Any, TypeId}, collections::HashMap, fs, path::Path};
+use std::{
+    any::{Any, TypeId},
+    collections::HashMap,
+    fs,
+    path::Path,
+};
 
 use anyhow::Context;
 use rinja::Template;

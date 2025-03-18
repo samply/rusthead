@@ -13,6 +13,8 @@ fn main() -> anyhow::Result<()> {
     modules::MODULES
         .iter()
         .for_each(|&m| services.install_module(m, &conf));
-    services.write_composables(&conf.srv_dir).context("Failed to write services")?;
+    services
+        .write_composables(&conf.srv_dir)
+        .context("Failed to write services")?;
     Ok(())
 }

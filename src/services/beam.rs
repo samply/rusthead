@@ -1,7 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData, path::PathBuf, str::FromStr};
 
-use url::Url;
 use rinja::Template;
+use url::Url;
 
 use crate::{utils::generate_password, Config};
 
