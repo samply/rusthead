@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use bcrypt::DEFAULT_COST;
 use rinja::Template;
 
-use crate::utils::generate_password;
+use crate::utils::{generate_password, filters};
 
 use super::Service;
 

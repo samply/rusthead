@@ -23,7 +23,7 @@ services:
       - source: certificates.yaml
         target: /configuration/certificates.yaml
     volumes:
-      - {{ tls_dir.as_path().display() }}:/certs:ro
+      - {{ tls_dir|path }}:/certs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
 configs:

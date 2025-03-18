@@ -10,6 +10,8 @@ use rinja::Template;
 
 use crate::{modules::Module, Config};
 
+mod forward_proxy;
+pub use forward_proxy::ForwardProxy;
 mod beam;
 pub use beam::*;
 mod focus;

@@ -12,3 +12,14 @@ pub fn generate_password<const N: usize>() -> String {
         })
         .collect()
 }
+
+pub mod filters {
+    use std::path::PathBuf;
+
+    pub fn path(p: &PathBuf) -> rinja::Result<String> {
+        Ok(p.canonicalize()
+            .map_err(|e| rinja::Error::Custom(e.into()))?
+            .display()
+            .to_string())
+    }
+}

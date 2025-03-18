@@ -1,0 +1,17 @@
+services:
+  {{ Self::service_name() }}:
+    image: docker.verbis.dkfz.de/cache/samply/bridgehead-forward-proxy:latest
+    {% if let Some(https_proxy_url) = https_proxy_url -%}
+    environment:
+      HTTPS_PROXY: {{ https_proxy_url }}
+      HTTPS_PROXY_USERNAME: {{ https_proxy_url.username() }}
+      HTTPS_PROXY_PASSWORD: {{ https_proxy_url.password().unwrap_or_default() }}
+    {%- endif %}
+    tmpfs:
+      - /var/log/squid
+      - /var/spool/squid
+    volumes:
+      - {{ trusted_ca_certs|path }}:/docker/custom-certs/:ro
+    healthcheck:
+      # Wait 1s before marking this service healthy. Required for the oauth2-proxy to talk to the OIDC provider on startup which will fail if the forward proxy is not started yet.
+      test: ["CMD", "sleep", "1"]

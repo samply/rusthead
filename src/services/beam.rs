@@ -3,9 +3,9 @@ use std::{collections::HashMap, marker::PhantomData, path::PathBuf, str::FromStr
 use rinja::Template;
 use url::Url;
 
-use crate::{utils::generate_password, Config};
+use crate::{utils::{generate_password, filters}, Config};
 
-use super::Service;
+use super::{Deps, ForwardProxy, Service};
 
 pub trait BrokerProvider: 'static {
     fn broker_url() -> Url;
@@ -20,6 +20,7 @@ pub struct BeamProxy<T: BrokerProvider> {
     proxy_id: String,
     priv_key: PathBuf,
     app_keys: HashMap<&'static str, String>,
+    fw_proxy_url: Url,
 }
 
 impl<T: BrokerProvider> BeamProxy<T> {
@@ -38,14 +39,15 @@ impl<T: BrokerProvider> BeamProxy<T> {
 }
 
 impl<T: BrokerProvider> Service for BeamProxy<T> {
-    type Dependencies<'a> = ();
+    type Dependencies<'a> = (ForwardProxy,);
 
-    fn from_config(conf: &Config, _: Self::Dependencies<'_>) -> Self {
+    fn from_config(conf: &Config, (fw_proxy,): Deps<'_, Self>) -> Self {
         BeamProxy {
             broker_provider: PhantomData,
             priv_key: conf.path.join(format!("pki/{}.priv.pem", conf.site_id)),
             proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
             app_keys: Default::default(),
+            fw_proxy_url: fw_proxy.get_url(),
         }
     }
 

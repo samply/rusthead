@@ -7,8 +7,7 @@ use url::Url;
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub site_id: String,
-    pub http_proxy: Option<Url>,
-    pub https_proxy: Option<Url>,
+    pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     // TODO Actual structs
     pub bbmri: Option<HashMap<String, toml::Value>>,
