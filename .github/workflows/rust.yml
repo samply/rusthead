@@ -1,0 +1,30 @@
+name: Rust
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+  pull_request:
+
+jobs:
+  rust:
+    # This workflow defines how a maven package is built, tested and published.
+    # Visit: https://github.com/samply/github-workflows/blob/develop/.github/workflows/docker-ci.yml, for more information
+    uses: samply/github-workflows/.github/workflows/rust.yml@main
+    permissions:
+      contents: read
+      packages: write
+      pull-requests: read
+      security-events: write
+      statuses: read
+    with:
+        image-prefix: "samply/"
+        components: '[ "rusthead" ]'
+        architectures: '[ "amd64" ]'
+        test-via-script: true
+        push-to: ${{ (github.ref_protected == true || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && 'dockerhub' || 'none' }}
+    secrets:
+        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
