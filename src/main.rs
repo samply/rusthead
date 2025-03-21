@@ -1,4 +1,5 @@
 use anyhow::Context;
+use bridgehead::Bridgehead;
 use config::Config;
 use services::ServiceMap;
 
@@ -6,6 +7,7 @@ mod config;
 mod modules;
 mod services;
 mod utils;
+mod bridgehead;
 
 fn main() -> anyhow::Result<()> {
     let conf = Config::load().context("Failed to load config")?;
@@ -16,5 +18,6 @@ fn main() -> anyhow::Result<()> {
     services
         .write_composables(&conf.srv_dir)
         .context("Failed to write services")?;
+    Bridgehead::new(&conf).write()?;
     Ok(())
 }

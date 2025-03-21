@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData, path::PathBuf, str::FromStr};
+use std::{cell::RefCell, collections::HashMap, marker::PhantomData, path::PathBuf, str::FromStr};
 
 use rinja::Template;
 use url::Url;
@@ -42,6 +42,7 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
     type Dependencies<'a> = (ForwardProxy,);
 
     fn from_config(conf: &Config, (fw_proxy,): Deps<'_, Self>) -> Self {
+        BEAM_NETWORKS.with_borrow_mut(|nets| nets.push(T::broker_url().host().unwrap().to_string()));
         BeamProxy {
             broker_provider: PhantomData,
             priv_key: conf.path.join(format!("pki/{}.priv.pem", conf.site_id)),
@@ -54,4 +55,8 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
     fn service_name() -> String {
         format!("{}-beam-proxy", T::network_name())
     }
+}
+
+thread_local! {
+    pub static BEAM_NETWORKS: RefCell<Vec<String>> = RefCell::default();
 }

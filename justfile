@@ -10,7 +10,7 @@ run:
 up: run
   #!/usr/bin/env bash
   srv_dir=$(cat {{ CONFIG_FILE }} | grep -v '#' | grep srv_dir | sed 's/.*=\s*\"\(.*\)\"/\1/')
-  docker compose $(ls $srv_dir/services | awk -v dir="$srv_dir" '{print " -f " dir "/services/" $0}') up
+  $srv_dir/bridgehead start
 
 dockerize:
   cargo build --release
