@@ -10,7 +10,7 @@ run:
 up: run
   #!/usr/bin/env bash
   srv_dir=$(cat {{ CONFIG_FILE }} | grep -v '#' | grep srv_dir | sed 's/.*=\s*\"\(.*\)\"/\1/')
-  $srv_dir/bridgehead start
+  $srv_dir/bridgehead compose up
 
 dockerize:
   cargo build --release

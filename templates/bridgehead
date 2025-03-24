@@ -6,19 +6,13 @@ COMPOSE_FILES="$(ls services | awk '{print " -f services/" $0}')"
 [ -e ./docker-compose.override.yml ] && COMPOSE_FILES+=" -f docker-compose.override.yml"
 
 case "$1" in
-	start)
-		exec docker compose -p bridgehead $COMPOSE_FILES up --abort-on-container-exit
-		;;
-	stop)
-		exec docker compose -p bridgehead $COMPOSE_FILES down
-		;;
 	logs)
 		shift 2
 		exec journalctl -u bridgehead@$PROJECT -u bridgehead-update@$PROJECT -a $@
 		;;
-	docker-logs)
-		shift 2
-		exec docker compose -p bridgehead $COMPOSE_FILES logs $@
+	compose)
+		shift
+		exec docker compose -p bridgehead $COMPOSE_FILES $@
 		;;
 	update)
 		docker pull samply/rusthead:latest
