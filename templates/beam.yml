@@ -9,7 +9,10 @@ services:
       {% endfor -%}
       ROOTCERT_FILE: /conf/root.crt.pem
       PRIVKEY_FILE: /run/secrets/proxy.pem
+      TLS_CA_CERTIFICATES_DIR: /conf/trusted-ca-certs
       ALL_PROXY: {{ fw_proxy_url }}
+    volumes:
+      - {{ trusted_ca_certs|path }}:/conf/trusted-ca-certs:ro
     secrets:
       - proxy.pem
     configs:

@@ -32,6 +32,10 @@ impl Config {
         conf.path = conf_path;
         Ok(conf)
     }
+
+    pub fn trusted_ca_certs(&self) -> PathBuf {
+        self.path.join("trusted-ca-certs")
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -9,7 +9,7 @@ use crate::utils::filters;
 #[derive(Debug, Template)]
 #[template(path = "forward_proxy.yml")]
 pub struct ForwardProxy {
-    https_proxy_url: Option<Url>,
+    pub https_proxy_url: Option<Url>,
     trusted_ca_certs: PathBuf,
 }
 
@@ -25,7 +25,7 @@ impl Service for ForwardProxy {
     fn from_config(conf: &crate::config::Config, _: super::Deps<'_, Self>) -> Self {
         Self {
             https_proxy_url: conf.https_proxy_url.clone(),
-            trusted_ca_certs: conf.path.join("trusted-ca-certs"),
+            trusted_ca_certs: conf.trusted_ca_certs()
         }
     }
 

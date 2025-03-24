@@ -17,8 +17,9 @@ pub trait BrokerProvider: 'static {
 #[template(path = "beam.yml")]
 pub struct BeamProxy<T: BrokerProvider> {
     broker_provider: PhantomData<T>,
-    proxy_id: String,
-    priv_key: PathBuf,
+    pub proxy_id: String,
+    pub priv_key: PathBuf,
+    pub trusted_ca_certs: PathBuf,
     app_keys: HashMap<&'static str, String>,
     fw_proxy_url: Url,
 }
@@ -49,6 +50,7 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
             proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
             app_keys: Default::default(),
             fw_proxy_url: fw_proxy.get_url(),
+            trusted_ca_certs: conf.trusted_ca_certs(),
         }
     }
 
