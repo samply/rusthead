@@ -25,7 +25,7 @@ impl Service for ForwardProxy {
     fn from_config(conf: &crate::config::Config, _: super::Deps<'_, Self>) -> Self {
         Self {
             https_proxy_url: conf.https_proxy_url.clone(),
-            trusted_ca_certs: conf.trusted_ca_certs()
+            trusted_ca_certs: conf.trusted_ca_certs(),
         }
     }
 

@@ -1,16 +1,22 @@
+use std::path::PathBuf;
+
 use anyhow::Context;
 use bridgehead::Bridgehead;
 use config::Config;
 use services::ServiceMap;
 
+mod bridgehead;
 mod config;
 mod modules;
 mod services;
 mod utils;
-mod bridgehead;
 
 fn main() -> anyhow::Result<()> {
-    let conf = Config::load().context("Failed to load config")?;
+    let conf_path: PathBuf = std::env::var("BRIDGEHEAD_CONFIG_PATH")
+        .unwrap_or_else(|_| "/etc/bridgehead".into())
+        .into();
+    let conf = Config::load(&conf_path)
+        .with_context(|| format!("Failed to load config from {conf_path:?}"))?;
     let mut services = ServiceMap::default();
     modules::MODULES
         .iter()
@@ -19,5 +25,6 @@ fn main() -> anyhow::Result<()> {
         .write_composables(&conf.srv_dir)
         .context("Failed to write services")?;
     Bridgehead::new(&conf).write()?;
+    conf.write_local_conf()?;
     Ok(())
 }

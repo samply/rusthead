@@ -3,7 +3,8 @@ use std::str::FromStr;
 use url::Url;
 
 use crate::services::{
-    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, ServiceMap,
+    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, OidcProvider,
+    ServiceMap,
 };
 
 use super::Module;
@@ -44,5 +45,20 @@ impl BrokerProvider for CcpDefault {
 
     fn root_cert() -> &'static str {
         include_str!("../../static/ccp.root.crt.pem")
+    }
+}
+
+impl OidcProvider for CcpDefault {
+    type BeamProvider = Self;
+
+    fn oidc_provider_id() -> String {
+        format!(
+            "secret-sync-central.central-secret-sync.{}",
+            Self::BeamProvider::broker_id()
+        )
+    }
+
+    fn issuer_url() -> Url {
+        Url::parse("https://login.verbis.dkfz.de/realms/test-realm-01").unwrap()
     }
 }

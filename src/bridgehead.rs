@@ -1,4 +1,7 @@
-use std::{fs::{self, Permissions}, path::PathBuf};
+use std::{
+    fs::{self, Permissions},
+    path::PathBuf,
+};
 
 use rinja::Template;
 
@@ -20,10 +23,10 @@ impl<'c> Bridgehead<'c> {
             pwd: &conf.srv_dir,
         }
     }
-    
+
     pub fn write(&self) -> anyhow::Result<()> {
         let path = self.pwd.join("bridgehead");
-        fs::write( &path, self.render()?)?;
+        fs::write(&path, self.render()?)?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

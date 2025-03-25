@@ -18,7 +18,13 @@ pub mod filters {
 
     pub fn path(p: &PathBuf) -> rinja::Result<String> {
         Ok(p.canonicalize()
-            .map_err(|e| rinja::Error::Custom(e.into()))?
+            .map_err(|e| {
+                rinja::Error::Custom(
+                    anyhow::Error::from(e)
+                        .context(format!("Failed to canonicalize {p:?}"))
+                        .into(),
+                )
+            })?
             .display()
             .to_string())
     }

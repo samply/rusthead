@@ -12,6 +12,8 @@ use crate::{modules::Module, Config};
 
 mod forward_proxy;
 pub use forward_proxy::ForwardProxy;
+mod secret_sync;
+pub use secret_sync::*;
 mod beam;
 pub use beam::*;
 mod focus;

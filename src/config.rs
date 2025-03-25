@@ -1,6 +1,6 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, fs, ops::Deref, path::PathBuf, rc::Rc};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -16,6 +16,9 @@ pub struct Config {
     pub srv_dir: PathBuf,
     #[serde(skip)]
     pub path: PathBuf,
+
+    #[serde(skip)]
+    pub local_conf: Rc<RefCell<LocalConf>>,
 }
 
 fn default_srv_dir() -> PathBuf {
@@ -23,18 +26,32 @@ fn default_srv_dir() -> PathBuf {
 }
 
 impl Config {
-    pub fn load() -> anyhow::Result<Self> {
-        let conf_path: PathBuf = std::env::var("BRIDGEHEAD_CONFIG_PATH")
-            .unwrap_or_else(|_| "/etc/bridgehead".into())
-            .into();
-        let mut conf: Config =
-            toml::from_str(&std::fs::read_to_string(conf_path.join("config.toml"))?)?;
-        conf.path = conf_path;
+    pub fn load(path: &PathBuf) -> anyhow::Result<Self> {
+        let mut conf: Config = toml::from_str(&std::fs::read_to_string(path.join("config.toml"))?)?;
+        conf.path = path.clone();
+        let local_conf = fs::read_to_string(conf.local_conf_path())
+            .ok()
+            .and_then(|data| toml::from_str(&data).ok())
+            .unwrap_or_else(|| {
+                eprintln!("Failed to read local config creating a new one");
+                LocalConf::default()
+            });
+        conf.local_conf = Rc::new(RefCell::new(local_conf));
         Ok(conf)
     }
 
     pub fn trusted_ca_certs(&self) -> PathBuf {
         self.path.join("trusted-ca-certs")
+    }
+
+    pub fn local_conf_path(&self) -> PathBuf {
+        self.path.join("config.local.toml")
+    }
+
+    pub fn write_local_conf(&self) -> anyhow::Result<()> {
+        let conf_str = toml::to_string_pretty(self.local_conf.borrow().deref())?;
+        fs::write(self.local_conf_path(), conf_str)?;
+        Ok(())
     }
 }
 
@@ -42,4 +59,10 @@ impl Config {
 #[serde(deny_unknown_fields)]
 pub struct CcpConfig {
     // TODO
+}
+
+#[derive(Debug, Deserialize, Serialize, Default)]
+#[serde(deny_unknown_fields)]
+pub struct LocalConf {
+    pub oidc: Option<HashMap<String, String>>,
 }

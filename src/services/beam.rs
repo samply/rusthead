@@ -3,7 +3,10 @@ use std::{cell::RefCell, collections::HashMap, marker::PhantomData, path::PathBu
 use rinja::Template;
 use url::Url;
 
-use crate::{utils::{generate_password, filters}, Config};
+use crate::{
+    utils::{filters, generate_password},
+    Config,
+};
 
 use super::{Deps, ForwardProxy, Service};
 
@@ -11,6 +14,10 @@ pub trait BrokerProvider: 'static {
     fn broker_url() -> Url;
     fn network_name() -> &'static str;
     fn root_cert() -> &'static str;
+
+    fn broker_id() -> String {
+        Self::broker_url().host().unwrap().to_string()
+    }
 }
 
 #[derive(Debug, Template)]
@@ -43,11 +50,11 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
     type Dependencies<'a> = (ForwardProxy,);
 
     fn from_config(conf: &Config, (fw_proxy,): Deps<'_, Self>) -> Self {
-        BEAM_NETWORKS.with_borrow_mut(|nets| nets.push(T::broker_url().host().unwrap().to_string()));
+        BEAM_NETWORKS.with_borrow_mut(|nets| nets.push(T::broker_id()));
         BeamProxy {
             broker_provider: PhantomData,
             priv_key: conf.path.join(format!("pki/{}.priv.pem", conf.site_id)),
-            proxy_id: format!("{}.{}", conf.site_id, T::broker_url().host().unwrap()),
+            proxy_id: format!("{}.{}", conf.site_id, T::broker_id()),
             app_keys: Default::default(),
             fw_proxy_url: fw_proxy.get_url(),
             trusted_ca_certs: conf.trusted_ca_certs(),

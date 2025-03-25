@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use bcrypt::DEFAULT_COST;
 use rinja::Template;
 
-use crate::utils::{generate_password, filters};
+use crate::utils::{filters, generate_password};
 
 use super::Service;
 
@@ -25,9 +25,9 @@ impl Traefik {
 impl Service for Traefik {
     type Dependencies<'s> = ();
 
-    fn from_config(_conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
+    fn from_config(conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
         Self {
-            tls_dir: "/etc/bridgehead/traefik-tls".into(),
+            tls_dir: conf.path.join("traefik-tls"),
             basic_auth_users: Default::default(),
         }
     }
