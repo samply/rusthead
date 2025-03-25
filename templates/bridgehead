@@ -2,6 +2,7 @@
 set -e
 set -o pipefail
 
+cd {{ pwd|path }}
 COMPOSE_FILES="$(ls services | awk '{print " -f services/" $0}')"
 [ -e ./docker-compose.override.yml ] && COMPOSE_FILES+=" -f docker-compose.override.yml"
 
@@ -16,7 +17,7 @@ case "$1" in
 		;;
 	update)
 		docker pull samply/rusthead:latest
-		exec docker run -v {{ config_dir|path }}:{{ config_dir|path }} -v $(pwd):$(pwd) samply/rusthead:latest update
+		exec docker run -v {{ config_dir|path }}:{{ config_dir|path }} -v {{ pwd|path }}:{{ pwd|path }} samply/rusthead:latest update
 		;;
 	enroll)
 		do_enroll {{ beam_networks|join(" ") }}

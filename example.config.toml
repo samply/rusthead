@@ -4,7 +4,7 @@ site_id = "dummy"
 # https_proxy = "http://dummy:8080"
 # http_proxy = "http://dummy:8080"
 # Default value
-# srv_dir = "/srv/docker/bridgehead" # For dev purposes set this to .
+srv_dir = "/srv/docker/bridgehead"
 
 [ccp]
 

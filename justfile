@@ -4,7 +4,7 @@ set shell := ["bash", "-cue"]
 ARCH := `docker version --format '{{.Server.Arch}}'`
 CONFIG_PATH := canonicalize(env("BRIDGEHEAD_CONFIG_PATH", "/etc/bridgehead"))
 CONFIG_FILE := CONFIG_PATH / "config.toml"
-SRV_PATH := canonicalize(shell("""cat {{ CONFIG_FILE }} | grep -v '#' | grep srv_dir | sed 's/.*=\\s*\\"\\(.*\\)\\"/\\1/'""")) || "/srv/docker/bridgehead"
+SRV_PATH := canonicalize(shell("""cat $1 | grep -v '#' | grep srv_dir | sed 's/.*=\\s*\\"\\(.*\\)\\"/\\1/'""", CONFIG_FILE)) || "/srv/docker/bridgehead"
 
 run: build
   docker run --rm -v {{ SRV_PATH }}:{{ SRV_PATH }} -v {{ CONFIG_PATH }}:{{ CONFIG_PATH }} -e BRIDGEHEAD_CONFIG_PATH={{ CONFIG_PATH }} rusthead
@@ -26,5 +26,6 @@ build:
   docker build -t rusthead .
 
 bootstrap:
-  cp -n example.config.toml {{ CONFIG_FILE }}
-  echo "Change the site id in {{ CONFIG_FILE }}"
+  mkdir -p ./bridgehead
+  sed 's|/srv/docker/bridgehead|{{ canonicalize(".") / "bridgehead" }}|' example.config.toml > {{ CONFIG_FILE }}
+  @echo "Change your site_id in {{ CONFIG_FILE }}"

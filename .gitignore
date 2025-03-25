@@ -1,6 +1,4 @@
 /target
-/services
 /artifacts
 .env
-bridgehead
-!templates/bridgehead
+/bridgehead

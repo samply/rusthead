@@ -17,7 +17,7 @@ pub struct Traefik {
 impl Traefik {
     // TODO: persist to some local.config.toml or smth maybe with toml_edit
     pub fn add_basic_auth_user(&mut self, middleware_name: String) {
-        let hashed_pw = bcrypt::hash(generate_password::<10>(), DEFAULT_COST).unwrap();
+        let hashed_pw = bcrypt::hash(generate_password::<10>(), DEFAULT_COST).unwrap().replace('$', "$$");
         self.basic_auth_users.insert(middleware_name, hashed_pw);
     }
 }
