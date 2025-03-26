@@ -28,7 +28,7 @@ impl BlazeProvider for CcpDefault {
 
     fn treafik_exposure() -> Option<BlazeTraefikConfig> {
         Some(BlazeTraefikConfig {
-            middleware_and_user_name: "ccp".into(),
+            middleware_and_user_name: "ccp-blaze".into(),
             path: "/ccp-localdatamanagement".into(),
         })
     }

@@ -1,9 +1,10 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use bcrypt::DEFAULT_COST;
 use rinja::Template;
+use serde::{Deserialize, Serialize};
 
-use crate::utils::{filters, generate_password};
+use crate::{config::LocalConf, utils::{filters, generate_password}};
 
 use super::Service;
 
@@ -11,14 +12,17 @@ use super::Service;
 #[template(path = "traefik.yml")]
 pub struct Traefik {
     tls_dir: PathBuf,
-    basic_auth_users: HashMap<String, String>,
+    local_conf: Rc<RefCell<LocalConf>>,
 }
 
 impl Traefik {
     // TODO: persist to some local.config.toml or smth maybe with toml_edit
     pub fn add_basic_auth_user(&mut self, middleware_name: String) {
-        let hashed_pw = bcrypt::hash(generate_password::<10>(), DEFAULT_COST).unwrap().replace('$', "$$");
-        self.basic_auth_users.insert(middleware_name, hashed_pw);
+        self.local_conf.borrow_mut().basic_auth_users.get_or_insert_default().entry(middleware_name).or_insert_with(||{
+            let pw = generate_password::<10>();
+            let hash = bcrypt::hash(&pw, DEFAULT_COST).unwrap();
+            BasicAuthUser { hash, pw: Some(pw) }
+        });
     }
 }
 
@@ -28,11 +32,17 @@ impl Service for Traefik {
     fn from_config(conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
         Self {
             tls_dir: conf.path.join("traefik-tls"),
-            basic_auth_users: Default::default(),
+            local_conf: conf.local_conf.clone(),
         }
     }
 
     fn service_name() -> String {
         "traefik".into()
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BasicAuthUser {
+    hash: String,
+    pw: Option<String>,
 }

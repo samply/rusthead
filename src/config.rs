@@ -3,6 +3,8 @@ use std::{cell::RefCell, collections::HashMap, fs, ops::Deref, path::PathBuf, rc
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::services::BasicAuthUser;
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -67,4 +69,5 @@ pub struct CcpConfig {
 #[serde(deny_unknown_fields)]
 pub struct LocalConf {
     pub oidc: Option<HashMap<String, String>>,
+    pub basic_auth_users: Option<HashMap<String, BasicAuthUser>>
 }
