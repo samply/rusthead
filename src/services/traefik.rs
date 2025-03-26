@@ -4,7 +4,10 @@ use bcrypt::DEFAULT_COST;
 use rinja::Template;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::LocalConf, utils::{filters, generate_password}};
+use crate::{
+    config::LocalConf,
+    utils::{filters, generate_password},
+};
 
 use super::Service;
 
@@ -18,11 +21,16 @@ pub struct Traefik {
 impl Traefik {
     // TODO: persist to some local.config.toml or smth maybe with toml_edit
     pub fn add_basic_auth_user(&mut self, middleware_name: String) {
-        self.local_conf.borrow_mut().basic_auth_users.get_or_insert_default().entry(middleware_name).or_insert_with(||{
-            let pw = generate_password::<10>();
-            let hash = bcrypt::hash(&pw, DEFAULT_COST).unwrap();
-            BasicAuthUser { hash, pw: Some(pw) }
-        });
+        self.local_conf
+            .borrow_mut()
+            .basic_auth_users
+            .get_or_insert_default()
+            .entry(middleware_name)
+            .or_insert_with(|| {
+                let pw = generate_password::<10>();
+                let hash = bcrypt::hash(&pw, DEFAULT_COST).unwrap();
+                BasicAuthUser { hash, pw: Some(pw) }
+            });
     }
 }
 

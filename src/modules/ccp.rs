@@ -3,8 +3,7 @@ use std::str::FromStr;
 use url::Url;
 
 use crate::services::{
-    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, OidcProvider,
-    ServiceMap,
+    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, OidcProvider, ServiceMap,
 };
 
 use super::Module;

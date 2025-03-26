@@ -29,10 +29,17 @@ fn default_srv_dir() -> PathBuf {
 
 impl Config {
     pub fn load(path: &PathBuf) -> anyhow::Result<Self> {
-        anyhow::ensure!(path.is_absolute(), "Path to config must be absolute unlike {path:?}");
+        anyhow::ensure!(
+            path.is_absolute(),
+            "Path to config must be absolute unlike {path:?}"
+        );
         let mut conf: Config = toml::from_str(&std::fs::read_to_string(path.join("config.toml"))?)?;
         conf.path = path.clone();
-        anyhow::ensure!(conf.srv_dir.is_absolute(), "srv_path must be absolute unlike {:?}", conf.srv_dir);
+        anyhow::ensure!(
+            conf.srv_dir.is_absolute(),
+            "srv_path must be absolute unlike {:?}",
+            conf.srv_dir
+        );
         let local_conf = fs::read_to_string(conf.local_conf_path())
             .ok()
             .and_then(|data| toml::from_str(&data).ok())
@@ -69,5 +76,5 @@ pub struct CcpConfig {
 #[serde(deny_unknown_fields)]
 pub struct LocalConf {
     pub oidc: Option<HashMap<String, String>>,
-    pub basic_auth_users: Option<HashMap<String, BasicAuthUser>>
+    pub basic_auth_users: Option<HashMap<String, BasicAuthUser>>,
 }

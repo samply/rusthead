@@ -1,5 +1,6 @@
 use std::{
-    collections::HashSet, fs::{self, Permissions}
+    collections::HashSet,
+    fs::{self, Permissions},
 };
 
 use rinja::Template;
@@ -10,7 +11,7 @@ use crate::{config::Config, services::BEAM_NETWORKS, utils::filters};
 #[template(path = "bridgehead")]
 pub struct Bridgehead<'c> {
     beam_networks: HashSet<String>,
-    conf: &'c Config
+    conf: &'c Config,
 }
 
 impl<'c> Bridgehead<'c> {

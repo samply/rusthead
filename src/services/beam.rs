@@ -1,4 +1,10 @@
-use std::{cell::RefCell, collections::{HashMap, HashSet}, marker::PhantomData, path::PathBuf, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    path::PathBuf,
+    str::FromStr,
+};
 
 use rinja::Template;
 use url::Url;
