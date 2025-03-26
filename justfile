@@ -19,6 +19,9 @@ down_bg:
 down:
   {{ SRV_PATH }}/bridgehead compose down
 
+bridgehead *args:
+  {{ SRV_PATH }}/bridgehead {{ args }}
+
 build:
   cargo build --release
   mkdir -p artifacts/binaries-{{ ARCH }}/
