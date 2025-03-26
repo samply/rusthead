@@ -199,8 +199,10 @@ impl<T: OidcProvider> PrivateOidcClient<T> {
             .as_ref()
             .unwrap()
             .get(&private_client_name)
-            .unwrap()
-            .clone()
+            .cloned()
+            // HACK: If we have a config that requires oidc and we are not enrolled yet we don't want to panic
+            // as that will prevent generation of the bridgehead script so lets default to an empty string.
+            .unwrap_or_default()
     }
 }
 
