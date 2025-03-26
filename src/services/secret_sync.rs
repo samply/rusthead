@@ -131,10 +131,7 @@ impl<T: OidcProvider> OidcClient<T> {
             .env("OIDC_PROVIDER", T::oidc_provider_id())
             .env("SECRET_DEFINITIONS", secret_sync_defs.join("\x1E"))
             .spawn()?;
-        if secret_sync.wait()?.success() {
-            // All secrets were synced successfully so clear oidc cache
-            _ = self.local_conf.borrow_mut().oidc.insert(HashMap::default());
-        };
+        secret_sync.wait()?;
         beam_proxy.kill()?;
         let out = fs::read_to_string("/usr/local/cache")?;
         let new_cache = out
