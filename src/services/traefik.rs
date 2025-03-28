@@ -1,7 +1,7 @@
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use bcrypt::DEFAULT_COST;
-use rinja::Template;
+use askama::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::{

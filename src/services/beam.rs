@@ -6,7 +6,7 @@ use std::{
     str::FromStr,
 };
 
-use rinja::Template;
+use askama::Template;
 use url::Url;
 
 use crate::{

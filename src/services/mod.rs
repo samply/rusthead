@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::Context;
-use rinja::Template;
+use askama::Template;
 
 use crate::{modules::Module, Config};
 

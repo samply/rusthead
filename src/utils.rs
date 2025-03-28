@@ -16,13 +16,11 @@ pub fn generate_password<const N: usize>() -> String {
 pub mod filters {
     use std::path::PathBuf;
 
-    pub fn path(p: &PathBuf) -> rinja::Result<String> {
+    pub fn path(p: &PathBuf) -> askama::Result<String> {
         Ok(p.canonicalize()
             .map_err(|e| {
-                rinja::Error::Custom(
-                    anyhow::Error::from(e)
-                        .context(format!("Failed to canonicalize {p:?}"))
-                        .into(),
+                askama::Error::custom(
+                    anyhow::Error::from(e).context(format!("Failed to canonicalize {p:?}")),
                 )
             })?
             .display()

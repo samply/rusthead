@@ -3,7 +3,7 @@ use std::{
     fs::{self, Permissions},
 };
 
-use rinja::Template;
+use askama::Template;
 
 use crate::{config::Config, services::BEAM_NETWORKS, utils::filters};
 

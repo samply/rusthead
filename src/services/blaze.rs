@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, str::FromStr};
 
-use rinja::Template;
+use askama::Template;
 use url::Url;
 
 use super::{Service, Traefik};
