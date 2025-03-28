@@ -4,35 +4,113 @@ set -o pipefail
 
 {%- let config_dir = filters::path(conf.path)? %}
 {%- let pwd = filters::path(conf.srv_dir)? %}
+{%- let priv_key_file = conf.path.join(format!("pki/{}.priv.pem", self.conf.site_id)) %}
 cd {{ pwd }}
 
 COMPOSE_FILES="$(ls services | awk '{print " -f services/" $0}')"
 [ -e ./docker-compose.override.yml ] && COMPOSE_FILES+=" -f docker-compose.override.yml"
 
-case "$1" in
-	logs)
-		shift 2
-		exec journalctl -u bridgehead@$PROJECT -u bridgehead-update@$PROJECT -a $@
-		;;
-	compose)
-		shift
-		exec docker compose -p bridgehead $COMPOSE_FILES $@
-		;;
-	update)
-		docker pull samply/rusthead:latest
-		exec docker run -v {{ config_dir }}:{{ config_dir }} -v {{ pwd }}:{{ pwd }} samply/rusthead:latest update
-		;;
-	enroll)
-        do_enroll() {
-            {%- let priv_key_file = conf.path.join(format!("pki/{}.priv.pem", self.conf.site_id)) %}
-            docker run --rm -v {{ config_dir }}/pki:{{ config_dir }}/pki docker.verbis.dkfz.de/cache/samply/beam-enroll:latest --output-file {{ priv_key_file|path }} --proxy-id {{ conf.site_id }}.$1
-            chmod 600 {{ priv_key_file|path }}
-        }
-        {% for broker in beam_networks -%}
-		    do_enroll {{ broker }}
-        {%- endfor %}
-		;;
-	*)
-		exit 1
-		;;
-esac
+main() {
+    case "$1" in
+        install)
+            [ "$(id -u)" -ne 0 ] && echo "Install command must be run as root." && exit 1
+            useradd -M -g docker -N bridgehead &>/dev/null || echo "Using existing user bridgehead."
+            chown -R bridgehead:docker {{ config_dir }} {{ pwd }}
+            chmod -R g+sw {{ config_dir }} {{ pwd }}
+            install_systemd
+            {%- if beam_networks.is_empty() %}
+            echo "Starting bridgehead service ..."
+            systemctl start bridgehead
+            echo "You may inspect the logs with './bridgehead logs -f' now"
+            {%- else %}
+            if [ -e {{ priv_key_file.display() }} ]; then
+                echo "Private key already exists. Skipping enrollment."
+                echo "If you want to re-enroll or changed the configuration and are now included in a new beam network run 'sudo ./bridgehead enroll'."
+                echo "Installation complete."
+            else
+                enroll
+            fi
+            {%- endif %}
+            ;;
+        logs)
+            shift 2
+            exec journalctl -u bridgehead -u bridgehead-update -a $@
+            ;;
+        compose)
+            shift
+            exec docker compose -p bridgehead $COMPOSE_FILES $@
+            ;;
+        enroll)
+            [ "$(id -u)" -ne 0 ] && echo "Enroll must be run as root." && exit 1
+            enroll
+            ;;
+        update)
+            docker pull samply/rusthead:latest
+            exec docker run -v {{ config_dir }}:{{ config_dir }} -v {{ pwd }}:{{ pwd }} samply/rusthead:latest update
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+}
+
+{%- if !beam_networks.is_empty() %}
+enroll() {
+    do_enroll() {
+        echo "Enrolling {{ conf.site_id }}.$1"
+        docker run --rm -v {{ config_dir }}/pki:{{ config_dir }}/pki docker.verbis.dkfz.de/cache/samply/beam-enroll:latest --output-file {{ priv_key_file|path }} --proxy-id {{ conf.site_id }}.$1
+        chmod 600 {{ priv_key_file|path }}
+    }
+    {% for broker in beam_networks -%}
+        do_enroll {{ broker }}
+    {%- endfor %}
+    echo "After getting the csr{{ beam_networks.len()|pluralize }} enrolled you may start the bridgehead service with 'systemctl start bridgehead'."
+}
+{%- endif %}
+
+install_systemd() {
+    [ ! systemctl list-units &> /dev/null ] || echo "Systemd is not active. Skipping systemd setup." && return
+    cat <<EOF > /etc/systemd/system/bridgehead.service
+[Unit]
+Description=Bridgehead Service
+Requires=docker.service
+
+[Service]
+ExecStart={{ pwd }}/bridgehead compose up
+Restart=always
+User=bridgehead
+Group=docker
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    cat <<EOF > /etc/systemd/system/bridgehead-update.service
+[Unit]
+Description=Bridgehead Update Service
+Requires=docker.service
+
+[Service]
+ExecStart={{ pwd }}/bridgehead update
+User=bridgehead
+Group=docker
+EOF
+    cat <<EOF > /etc/systemd/system/bridgehead-update.timer
+[Unit]
+Description=Daily Updates at 6am of Bridgehead
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+
+[Install]
+WantedBy=basic.target
+EOF
+    systemctl daemon-reload
+    systemctl start bridgehead-update.service
+    echo "Enabling autostart of bridgehead.service"
+    systemctl enable bridgehead.service
+    echo "Enabling auto-updates for bridgehead.service ..."
+    systemctl enable --now bridgehead-update.timer
+}
+
+main "$@"
