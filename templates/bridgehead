@@ -19,9 +19,8 @@ main() {
             chmod -R g+sw {{ config_dir }} {{ pwd }}
             install_systemd
             {%- if beam_networks.is_empty() %}
-            echo "Starting bridgehead service ..."
-            systemctl start bridgehead
-            echo "You may inspect the logs with './bridgehead logs -f' now"
+                echo "Installation complete."
+                echo "You may start the bridgehead service with 'systemctl start bridgehead' or './bridgehead compose up' now."
             {%- else %}
             if [ -e {{ priv_key_file.display() }} ]; then
                 echo "Private key already exists. Skipping enrollment."
@@ -45,8 +44,7 @@ main() {
             enroll
             ;;
         update)
-            docker pull samply/rusthead:latest
-            exec docker run -v {{ config_dir }}:{{ config_dir }} -v {{ pwd }}:{{ pwd }} samply/rusthead:latest update
+            exec docker run --rm --pull always -v {{ config_dir }}:{{ config_dir }} -v {{ pwd }}:{{ pwd }} -e BRIDGEHEAD_CONFIG_PATH={{ config_dir }} samply/rusthead:latest update
             ;;
         *)
             exit 1

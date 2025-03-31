@@ -12,3 +12,4 @@ askama = { version = "0.13", default-features = false, features = ["derive", "st
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
 url = { version = "2", features = ["serde"] }
+clap = { version = "4.5", features = ["derive", "env"] }
