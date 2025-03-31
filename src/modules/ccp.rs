@@ -43,7 +43,7 @@ impl BrokerProvider for CcpDefault {
     }
 
     fn root_cert() -> &'static str {
-        include_str!("../../static/ccp.root.crt.pem")
+        include_str!("../../static/beam/ccp.root.crt.pem")
     }
 }
 
