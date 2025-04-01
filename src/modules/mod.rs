@@ -1,5 +1,5 @@
-mod ccp;
 mod bbmri;
+mod ccp;
 
 pub use bbmri::BbmriConfig;
 

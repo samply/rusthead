@@ -31,7 +31,7 @@ fn main() -> anyhow::Result<()> {
         Args::Bootstrap => {
             println!("{}", include_str!("../static/bootstrap.sh"));
             return Ok(());
-        },
+        }
         Args::Update { config } => config,
     };
     let conf = Config::load(&conf_path)

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
 
-use bcrypt::DEFAULT_COST;
 use askama::Template;
+use bcrypt::DEFAULT_COST;
 use serde::{Deserialize, Serialize};
 
 use crate::{

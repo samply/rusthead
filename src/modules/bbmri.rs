@@ -5,7 +5,6 @@ use crate::utils::enabled;
 
 use super::Module;
 
-
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BbmriConfig {

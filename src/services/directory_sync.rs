@@ -49,10 +49,7 @@ impl<T: BlazeProvider> Service for DirectorySync<T> {
         format!("{}-directory-sync", T::balze_service_name())
     }
 
-    fn from_config(
-        conf: &crate::config::Config,
-        (blaze,): Deps<'_, Self>,
-    ) -> Self {
+    fn from_config(conf: &crate::config::Config, (blaze,): Deps<'_, Self>) -> Self {
         let directory_sync_config = conf
             .bbmri
             .as_ref()
