@@ -11,12 +11,12 @@ use super::Module;
 pub struct CcpDefault;
 
 impl Module for CcpDefault {
-    fn enabled(&self, conf: &crate::Config) -> bool {
-        conf.ccp.is_some()
-    }
-
     fn install(&self, service_map: &mut ServiceMap, conf: &crate::Config) {
-        service_map.install::<Focus<Self, Blaze<Self>>>(conf);
+        let Some(_ccp_conf) = conf.ccp.as_ref() else {
+            return;
+        };
+        let focus = service_map.install::<Focus<Self, Blaze<Self>>>(conf);
+        focus.tag = "main-dktk".into();
     }
 }
 

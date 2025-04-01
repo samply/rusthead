@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, fs, ops::Deref, path::PathBuf, rc
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::services::BasicAuthUser;
+use crate::{modules::BbmriConfig, services::BasicAuthUser};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -11,9 +11,7 @@ pub struct Config {
     pub site_id: String,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
-    // TODO Actual structs
-    pub bbmri: Option<HashMap<String, toml::Value>>,
-    // etc..
+    pub bbmri: Option<BbmriConfig>,
     #[serde(default = "default_srv_dir")]
     pub srv_dir: PathBuf,
     #[serde(skip)]

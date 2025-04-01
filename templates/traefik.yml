@@ -13,9 +13,9 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
     labels:
       - "traefik.enable=true"
-      {% let conf = local_conf.borrow() %}
-      {% for (middleware, encoded_auth) in conf.basic_auth_users.iter().flatten() -%}
-        - "traefik.http.middlewares.{{ middleware }}.basicauth.users={{ middleware }}:{{ encoded_auth.hash.replace('$', "$$") }}"
+      {%- let conf = local_conf.borrow() %}
+      {%- for (middleware, encoded_auth) in conf.basic_auth_users.iter().flatten() %}
+      - "traefik.http.middlewares.{{ middleware }}.basicauth.users={{ middleware }}:{{ encoded_auth.hash.replace('$', "$$") }}"
       {%- endfor %}
     ports:
       - 80:80

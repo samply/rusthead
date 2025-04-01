@@ -10,6 +10,8 @@ use askama::Template;
 
 use crate::{modules::Module, Config};
 
+mod directory_sync;
+pub use directory_sync::*;
 mod forward_proxy;
 pub use forward_proxy::ForwardProxy;
 mod secret_sync;
@@ -139,9 +141,7 @@ impl ServiceMap {
     }
 
     pub fn install_module<M: Module>(&mut self, m: M, conf: &Config) {
-        if m.enabled(conf) {
-            m.install(self, conf);
-        }
+        m.install(self, conf);
     }
 
     pub fn write_composables(&self, srv_dir: impl AsRef<Path>) -> anyhow::Result<()> {

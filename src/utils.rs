@@ -13,6 +13,11 @@ pub fn generate_password<const N: usize>() -> String {
         .collect()
 }
 
+/// Helper for serde(default = "path_to_fn") as it does not work with constants
+pub const fn enabled() -> bool {
+    true
+}
+
 pub mod filters {
     use std::path::PathBuf;
 

@@ -1,0 +1,15 @@
+services:
+  directory_sync_service:
+    image: "docker.verbis.dkfz.de/cache/samply/directory_sync_service"
+    environment:
+      DS_DIRECTORY_URL: {{ conf.url }}
+      DS_DIRECTORY_USER_NAME: {{ conf.username }}
+      DS_DIRECTORY_USER_PASS: {{ conf.password }}
+      DS_TIMER_CRON: {{ conf.timer_cron }}
+      DS_DIRECTORY_ALLOW_STAR_MODEL: {{ conf.allow_star_model }}
+      DS_DIRECTORY_MOCK: {{ conf.mock }}
+      DS_DIRECTORY_DEFAULT_COLLECTION_ID: {{ conf.default_collection_id }}
+      DS_DIRECTORY_COUNTRY: {{ conf.country }}
+      DS_FHIR_STORE_URL: {{ blaze_url }}fhir/
+    depends_on:
+      - {{ T::balze_service_name() }}
