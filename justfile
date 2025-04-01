@@ -7,7 +7,7 @@ CONFIG_FILE := CONFIG_PATH / "config.toml"
 SRV_PATH := shell("""cat $1 | grep -v '#' | grep srv_dir | sed 's/.*=\\s*\\"\\(.*\\)\\"/\\1/'""", CONFIG_FILE) || "/srv/docker/bridgehead"
 
 run: build
-  docker run --rm -v {{ SRV_PATH }}:{{ SRV_PATH }} -v {{ CONFIG_PATH }}:{{ CONFIG_PATH }} -e BRIDGEHEAD_CONFIG_PATH={{ CONFIG_PATH }} samply/rusthead update
+  docker run --rm -u "$(id -u bridgehead):$(id -g bridgehead)" -v {{ SRV_PATH }}:{{ SRV_PATH }} -v {{ CONFIG_PATH }}:{{ CONFIG_PATH }} -e BRIDGEHEAD_CONFIG_PATH={{ CONFIG_PATH }} samply/rusthead update
 
 up: down_bg run
   {{ SRV_PATH }}/bridgehead compose up

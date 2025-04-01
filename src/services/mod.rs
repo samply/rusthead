@@ -146,6 +146,7 @@ impl ServiceMap {
 
     pub fn write_composables(&self, srv_dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let services_dir = srv_dir.as_ref().join("services");
+        _ = fs::remove_dir_all(&services_dir);
         fs::create_dir_all(&services_dir)?;
         for service in self.0.values() {
             fs::write(

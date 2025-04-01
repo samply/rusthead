@@ -40,5 +40,9 @@ else
     echo "Installation directory: $srv_dir"
 fi
 
-docker run --rm -v $srv_dir:$srv_dir -v $config_dir:$config_dir -e BRIDGEHEAD_CONFIG_PATH=$config_dir samply/rusthead update
+docker run --rm \
+    -v $srv_dir:$srv_dir \
+    -v $config_dir:$config_dir \
+    -e BRIDGEHEAD_CONFIG_PATH=$config_dir \
+    samply/rusthead update
 sudo $srv_dir/bridgehead install

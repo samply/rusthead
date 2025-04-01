@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, HashSet},
+    fs,
     marker::PhantomData,
     path::PathBuf,
     str::FromStr,
@@ -57,6 +58,7 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
 
     fn from_config(conf: &Config, (fw_proxy,): Deps<'_, Self>) -> Self {
         BEAM_NETWORKS.with_borrow_mut(|nets| nets.insert(T::broker_id()));
+        fs::create_dir_all(conf.path.join("pki")).unwrap();
         BeamProxy {
             broker_provider: PhantomData,
             priv_key: conf.path.join(format!("pki/{}.priv.pem", conf.site_id)),

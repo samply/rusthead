@@ -26,4 +26,4 @@ configs:
 
 secrets:
   proxy.pem:
-    file: {{ priv_key|path }}
+    file: {{ priv_key.display() }}

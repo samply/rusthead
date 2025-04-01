@@ -19,8 +19,8 @@ main() {
             chmod -R g+sw {{ config_dir }} {{ pwd }}
             install_systemd
             {%- if beam_networks.is_empty() %}
-                echo "Installation complete."
-                echo "You may start the bridgehead service with 'systemctl start bridgehead' or './bridgehead compose up' now."
+            echo "Installation complete."
+            echo "You may start the bridgehead service with 'systemctl start bridgehead' or './bridgehead compose up' now."
             {%- else %}
             if [ -e {{ priv_key_file.display() }} ]; then
                 echo "Private key already exists. Skipping enrollment."
@@ -32,10 +32,16 @@ main() {
             {%- endif %}
             ;;
         logs)
-            shift 2
+            shift
             exec journalctl -u bridgehead -u bridgehead-update -a $@
             ;;
         compose)
+            {%- if !beam_networks.is_empty() %}
+            if [ ! -f {{ priv_key_file.display() }} ]; then
+                echo "Beam private key not found. Please run 'sudo ./bridgehead enroll' first."
+                exit 1
+            fi
+            {%- endif %}
             shift
             exec docker compose -p bridgehead $COMPOSE_FILES $@
             ;;
@@ -44,7 +50,13 @@ main() {
             enroll
             ;;
         update)
-            exec docker run --rm --pull always -v {{ config_dir }}:{{ config_dir }} -v {{ pwd }}:{{ pwd }} -e BRIDGEHEAD_CONFIG_PATH={{ config_dir }} samply/rusthead:latest update
+            exec docker run --rm \
+                --pull always \
+                -v {{ config_dir }}:{{ config_dir }} \
+                -v {{ pwd }}:{{ pwd }} \
+                -e BRIDGEHEAD_CONFIG_PATH={{ config_dir }} \
+                -u "$(id -u bridgehead):$(id -g bridgehead)" \
+                samply/rusthead:latest update
             ;;
         *)
             exit 1
@@ -56,8 +68,12 @@ main() {
 enroll() {
     do_enroll() {
         echo "Enrolling {{ conf.site_id }}.$1"
-        docker run --rm -v {{ config_dir }}/pki:{{ config_dir }}/pki docker.verbis.dkfz.de/cache/samply/beam-enroll:latest --output-file {{ priv_key_file|path }} --proxy-id {{ conf.site_id }}.$1
-        chmod 600 {{ priv_key_file|path }}
+        docker run --rm \
+            -v {{ config_dir }}/pki:{{ config_dir }}/pki \
+            docker.verbis.dkfz.de/cache/samply/beam-enroll:latest \
+            --output-file {{ priv_key_file.display() }} \
+            --proxy-id {{ conf.site_id }}.$1
+        chmod 600 {{ priv_key_file.display() }}
     }
     {% for broker in beam_networks -%}
         do_enroll {{ broker }}

@@ -50,7 +50,9 @@ impl Config {
     }
 
     pub fn trusted_ca_certs(&self) -> PathBuf {
-        self.path.join("trusted-ca-certs")
+        let dir = self.path.join("trusted-ca-certs");
+        fs::create_dir_all(&dir).unwrap();
+        dir
     }
 
     pub fn local_conf_path(&self) -> PathBuf {
