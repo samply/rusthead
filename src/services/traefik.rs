@@ -4,10 +4,7 @@ use askama::Template;
 use bcrypt::DEFAULT_COST;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    config::LocalConf,
-    utils::{filters, generate_password},
-};
+use crate::{config::LocalConf, utils::filters};
 
 use super::Service;
 
@@ -27,7 +24,7 @@ impl Traefik {
             .get_or_insert_default()
             .entry(middleware_name)
             .or_insert_with(|| {
-                let pw = generate_password::<10>();
+                let pw = self.local_conf.borrow().generate_secret::<10>();
                 let hash = bcrypt::hash(&pw, DEFAULT_COST).unwrap();
                 BasicAuthUser { hash, pw: Some(pw) }
             });

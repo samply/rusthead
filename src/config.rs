@@ -1,5 +1,14 @@
-use std::{cell::RefCell, collections::HashMap, fs, ops::Deref, path::PathBuf, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fs,
+    ops::Deref,
+    path::PathBuf,
+    rc::Rc,
+    sync::{Mutex, OnceLock},
+};
 
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -75,6 +84,31 @@ pub struct CcpConfig {
 #[derive(Debug, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct LocalConf {
+    #[serde(default = "generate_seed")]
+    pub seed: u64,
     pub oidc: Option<HashMap<String, String>>,
     pub basic_auth_users: Option<HashMap<String, BasicAuthUser>>,
+}
+
+fn generate_seed() -> u64 {
+    rand::rng().random()
+}
+
+impl LocalConf {
+    pub fn generate_secret<const N: usize>(&self) -> String {
+        static RNG: OnceLock<Mutex<StdRng>> = OnceLock::new();
+        let mut rng = RNG
+            .get_or_init(|| StdRng::seed_from_u64(self.seed).into())
+            .lock()
+            .unwrap();
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                                abcdefghijklmnopqrstuvwxyz\
+                                0123456789)(*&^%#@!~";
+        (0..N)
+            .map(|_| {
+                let idx = rng.random_range(0..CHARSET.len());
+                CHARSET[idx] as char
+            })
+            .collect()
+    }
 }

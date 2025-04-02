@@ -4,16 +4,14 @@ use std::{
     fs,
     marker::PhantomData,
     path::PathBuf,
+    rc::Rc,
     str::FromStr,
 };
 
 use askama::Template;
 use url::Url;
 
-use crate::{
-    utils::{filters, generate_password},
-    Config,
-};
+use crate::{config::LocalConf, utils::filters, Config};
 
 use super::{Deps, ForwardProxy, Service};
 
@@ -36,6 +34,7 @@ pub struct BeamProxy<T: BrokerProvider> {
     pub trusted_ca_certs: PathBuf,
     app_keys: HashMap<&'static str, String>,
     fw_proxy_url: Url,
+    local_conf: Rc<RefCell<LocalConf>>,
 }
 
 impl<T: BrokerProvider> BeamProxy<T> {
@@ -44,7 +43,7 @@ impl<T: BrokerProvider> BeamProxy<T> {
         let secret = self
             .app_keys
             .entry(service_name)
-            .or_insert_with(generate_password::<16>);
+            .or_insert_with(|| self.local_conf.borrow().generate_secret::<10>());
         (format!("{service_name}.{}", self.proxy_id), secret.clone())
     }
 
@@ -66,6 +65,7 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
             app_keys: Default::default(),
             fw_proxy_url: fw_proxy.get_url(),
             trusted_ca_certs: conf.trusted_ca_certs(),
+            local_conf: conf.local_conf.clone(),
         }
     }
 
