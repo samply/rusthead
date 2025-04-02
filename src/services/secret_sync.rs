@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::bail;
-use url::Url;
+use url::{Host, Url};
 
 use crate::config::{Config, LocalConf};
 
@@ -55,8 +55,7 @@ impl<T: OidcProvider> OidcClient<T> {
                 .downcast_mut::<Self>()
                 .unwrap()
                 .pub_redirect_paths
-                // TODO: Host handeling
-                .push(path.to_owned());
+                .extend(redirect_urls_for_path(path, &conf.hostname));
         });
         PublicOidcClient {
             provider: PhantomData,
@@ -71,8 +70,7 @@ impl<T: OidcProvider> OidcClient<T> {
                 .downcast_mut::<Self>()
                 .unwrap()
                 .priv_redirect_urls
-                // TODO: Host handeling
-                .push(path.to_owned());
+                .extend(redirect_urls_for_path(path, &conf.hostname));
         });
         PrivateOidcClient {
             provider: PhantomData,
@@ -166,6 +164,22 @@ impl<T: OidcProvider> OidcClient<T> {
             client_spec.local_conf.clone()
         })
     }
+}
+
+fn redirect_urls_for_path(path: &str, host: &Host) -> Vec<String> {
+    let mut out = Vec::new();
+    match host {
+        Host::Domain(domain) => {
+            out.push(dbg!(format!("https://{domain}{path}")));
+            if let Some(without_proxy) = domain.split_once('.').map(|(root_domain, _)| root_domain)
+            {
+                out.push(dbg!(format!("https://{without_proxy}{path}")));
+            }
+        }
+        Host::Ipv4(ipv4_addr) => out.push(dbg!(format!("https://{ipv4_addr}{path}"))),
+        Host::Ipv6(ipv6_addr) => out.push(format!("https://[{ipv6_addr}]{path}")),
+    }
+    out
 }
 
 pub struct PublicOidcClient<T: OidcProvider> {

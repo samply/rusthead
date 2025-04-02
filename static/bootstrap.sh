@@ -19,10 +19,16 @@ if [ ! -f "${DEFAULT_CONFIG_DIR}/config.toml" ]; then
     
     read -p "Site ID: " site_id
 
+    default_hostname=$(hostname -f)
+    read -p "Hostname [$default_hostname]: " hostname
+    hostname="${hostname:-$default_hostname}"
+
     # Create config.toml
     mkdir -p "$config_dir"
     cat > "${config_dir}/config.toml" << EOF
 site_id = "$site_id"
+
+hostname = "$hostname"
 
 srv_dir = "$srv_dir"
 EOF

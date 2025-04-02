@@ -10,7 +10,7 @@ use std::{
 
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use url::Url;
+use url::{Host, Url};
 
 use crate::{modules::BbmriConfig, services::BasicAuthUser};
 
@@ -18,6 +18,7 @@ use crate::{modules::BbmriConfig, services::BasicAuthUser};
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub site_id: String,
+    pub hostname: Host,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
