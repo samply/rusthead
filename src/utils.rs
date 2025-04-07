@@ -17,3 +17,28 @@ pub mod filters {
             .to_string())
     }
 }
+
+pub mod host {
+    use std::net::{Ipv4Addr, Ipv6Addr};
+
+    use serde::Deserialize;
+    use url::Host;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Host, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        pub enum HostHelper {
+            Ipv4(Ipv4Addr),
+            Ipv6(Ipv6Addr),
+            Domain(String),
+        }
+        match HostHelper::deserialize(deserializer)? {
+            HostHelper::Ipv4(ipv4_addr) => Ok(Host::Ipv4(ipv4_addr)),
+            HostHelper::Ipv6(ipv6_addr) => Ok(Host::Ipv6(ipv6_addr)),
+            HostHelper::Domain(d) => Ok(Host::Domain(d)),
+        }
+    }
+}

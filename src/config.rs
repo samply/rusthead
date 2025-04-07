@@ -18,6 +18,7 @@ use crate::{modules::BbmriConfig, services::BasicAuthUser};
 #[serde(deny_unknown_fields)]
 pub struct Config {
     pub site_id: String,
+    #[serde(with = "crate::utils::host")]
     pub hostname: Host,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
