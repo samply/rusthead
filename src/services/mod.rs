@@ -8,7 +8,7 @@ use std::{
 use anyhow::Context;
 use askama::Template;
 
-use crate::{modules::Module, Config};
+use crate::{Config, modules::Module};
 
 mod id_managment;
 mod postgres;
@@ -70,23 +70,20 @@ macro_rules! service_tuple {
         impl<'t, $($ts: Service,)*> ServiceTuple<'t> for ($($ts,)*) {
             type DepRefs = ($(&'t mut $ts,)*);
 
-            #[allow(unused)]
+            #[allow(unused, non_snake_case)]
             fn get_or_create<'service: 't>(
                 conf: &Config,
                 services: &'service mut ServiceMap,
             ) -> Self::DepRefs {
-                let mut type_ids: Vec<TypeId> = vec![$(TypeId::of::<$ts>()),*];
-                let n = type_ids.len();
-                type_ids.dedup();
-                assert_eq!(n, type_ids.len(), "Service tuple needs to be disjoint");
-                // Safety:
-                // This is basically a HashMap::get_many_mut so as long as the types don't overlap,
-                // which we check above, this code is sound
-                unsafe {
-                    ($(
-                        $ts::get_or_create(conf, &mut *(services as *mut _)),
-                    )*)
-                }
+                // Ensure all services are created
+                $(
+                    $ts::get_or_create(conf, services);
+                )*
+                let [$($ts,)*] = services.0.get_disjoint_mut([
+                    $(&TypeId::of::<$ts>(),)*
+                ]);
+                // All services are guaranteed to be created at this point
+                ($(($ts.unwrap().as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap(),)*)
             }
         }
     };
@@ -98,7 +95,7 @@ service_tuple!(T1, T2);
 service_tuple!(T1, T2, T3);
 service_tuple!(T1, T2, T3, T4);
 
-pub trait ToCompose {
+pub trait ToCompose: Any {
     fn render(&self) -> anyhow::Result<String>;
 
     fn service_name(&self) -> String;
@@ -128,7 +125,7 @@ impl ServiceMap {
     pub fn get_mut<T: ToCompose + Any>(&mut self) -> Option<&mut T> {
         self.0
             .get_mut(&TypeId::of::<T>())
-            .map(|v| unsafe { &mut *(v.as_mut() as *mut dyn ToCompose as *mut T) })
+            .and_then(|v| (v.as_mut() as &mut dyn Any).downcast_mut::<T>())
     }
 
     pub fn insert<T: ToCompose + Any>(&mut self, v: T) {
