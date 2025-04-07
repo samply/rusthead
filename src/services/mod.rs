@@ -10,6 +10,9 @@ use askama::Template;
 
 use crate::{modules::Module, Config};
 
+mod id_managment;
+mod postgres;
+pub use id_managment::*;
 mod directory_sync;
 pub use directory_sync::*;
 mod forward_proxy;

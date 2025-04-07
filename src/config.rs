@@ -12,7 +12,10 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
-use crate::{modules::BbmriConfig, services::BasicAuthUser};
+use crate::{
+    modules::{BbmriConfig, CcpConfig},
+    services::BasicAuthUser,
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -75,12 +78,6 @@ impl Config {
         fs::write(self.local_conf_path(), conf_str)?;
         Ok(())
     }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct CcpConfig {
-    // TODO
 }
 
 #[derive(Debug, Deserialize, Serialize, Default)]

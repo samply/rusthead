@@ -1,22 +1,33 @@
 use std::str::FromStr;
 
+use serde::Deserialize;
 use url::Url;
 
 use crate::services::{
-    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, OidcProvider, ServiceMap,
+    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, IdManagement,
+    IdManagementConfig, OidcProvider, ServiceMap,
 };
 
 use super::Module;
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CcpConfig {
+    pub id_manager: Option<IdManagementConfig>,
+}
 
 pub struct CcpDefault;
 
 impl Module for CcpDefault {
     fn install(&self, service_map: &mut ServiceMap, conf: &crate::Config) {
-        let Some(_ccp_conf) = conf.ccp.as_ref() else {
+        let Some(ccp_conf) = conf.ccp.as_ref() else {
             return;
         };
         let focus = service_map.install::<Focus<Self, Blaze<Self>>>(conf);
         focus.tag = "main-dktk".into();
+        if ccp_conf.id_manager.is_some() {
+            service_map.install::<IdManagement<Self>>(conf);
+        }
     }
 }
 

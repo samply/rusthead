@@ -2,7 +2,7 @@ mod bbmri;
 mod ccp;
 
 pub use bbmri::BbmriConfig;
-
+pub use ccp::{CcpConfig, CcpDefault};
 use crate::{services::ServiceMap, Config};
 
 pub trait Module {

@@ -1,0 +1,12 @@
+services:
+  {{ Self::service_name() }}:
+    image: docker.verbis.dkfz.de/cache/postgres:15.6-alpine
+    environment:
+      POSTGRES_USER: {{ user}}
+      POSTGRES_DB: {{ db }}
+      POSTGRES_PASSWORD: {{ password }}
+    volumes:
+      - "{{ Self::service_name() }}:/var/lib/postgresql/data"
+  
+volumes:
+  {{ Self::service_name() }}:
