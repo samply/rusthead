@@ -28,11 +28,11 @@ pub use blaze::*;
 mod traefik;
 pub use traefik::*;
 
-pub type Deps<'a, T> = <<T as Service>::Dependencies as ServiceTuple<'a>>::DepRefs;
+pub type Deps<'a, T> = <<T as Service>::Dependencies as ServiceTuple>::DepRefs<'a>;
 
 // Could remove 'static bound by using dtolnay's typeid crate for the type map
 pub trait Service: ToCompose + 'static {
-    type Dependencies: for<'s> ServiceTuple<'s>;
+    type Dependencies: ServiceTuple;
 
     fn from_config(conf: &Config, deps: Deps<Self>) -> Self;
 
@@ -56,25 +56,25 @@ pub trait Service: ToCompose + 'static {
     }
 }
 
-pub trait ServiceTuple<'t> {
-    type DepRefs;
+pub trait ServiceTuple {
+    type DepRefs<'t>;
 
-    fn get_or_create<'service: 't>(
+    fn get_or_create<'service>(
         conf: &Config,
         services: &'service mut ServiceMap,
-    ) -> Self::DepRefs;
+    ) -> Self::DepRefs<'service>;
 }
 
 macro_rules! service_tuple {
     ($($ts:ident),*) => {
-        impl<'t, $($ts: Service,)*> ServiceTuple<'t> for ($($ts,)*) {
-            type DepRefs = ($(&'t mut $ts,)*);
+        impl<$($ts: Service,)*> ServiceTuple for ($($ts,)*) {
+            type DepRefs<'t> = ($(&'t mut $ts,)*);
 
             #[allow(unused, non_snake_case)]
-            fn get_or_create<'service: 't>(
+            fn get_or_create<'service>(
                 conf: &Config,
                 services: &'service mut ServiceMap,
-            ) -> Self::DepRefs {
+            ) -> Self::DepRefs<'service> {
                 // Ensure all services are created
                 $(
                     $ts::get_or_create(conf, services);
