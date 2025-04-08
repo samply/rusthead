@@ -28,13 +28,13 @@ pub use blaze::*;
 mod traefik;
 pub use traefik::*;
 
-pub type Deps<'a, T> = <<T as Service>::Dependencies<'a> as ServiceTuple<'a>>::DepRefs;
+pub type Deps<'a, T> = <<T as Service>::Dependencies as ServiceTuple<'a>>::DepRefs;
 
 // Could remove 'static bound by using dtolnay's typeid crate for the type map
 pub trait Service: ToCompose + 'static {
-    type Dependencies<'s>: ServiceTuple<'s>;
+    type Dependencies: for<'s> ServiceTuple<'s>;
 
-    fn from_config(conf: &Config, deps: Deps<'_, Self>) -> Self;
+    fn from_config(conf: &Config, deps: Deps<Self>) -> Self;
 
     fn service_name() -> String;
 

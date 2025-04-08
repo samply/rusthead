@@ -17,9 +17,9 @@ where
 }
 
 impl<T: Service> Service for Postgres<T> {
-    type Dependencies<'s> = ();
+    type Dependencies = ();
 
-    fn from_config(_conf: &crate::config::Config, _deps: super::Deps<'_, Self>) -> Self {
+    fn from_config(_conf: &crate::config::Config, _deps: super::Deps<Self>) -> Self {
         Self {
             r#for: PhantomData,
             user: <T as Service>::service_name(),

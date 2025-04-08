@@ -11,7 +11,7 @@ use std::{
 use askama::Template;
 use url::Url;
 
-use crate::{config::LocalConf, utils::filters, Config};
+use crate::{Config, config::LocalConf, utils::filters};
 
 use super::{Deps, ForwardProxy, Service};
 
@@ -53,9 +53,9 @@ impl<T: BrokerProvider> BeamProxy<T> {
 }
 
 impl<T: BrokerProvider> Service for BeamProxy<T> {
-    type Dependencies<'a> = (ForwardProxy,);
+    type Dependencies = (ForwardProxy,);
 
-    fn from_config(conf: &Config, (fw_proxy,): Deps<'_, Self>) -> Self {
+    fn from_config(conf: &Config, (fw_proxy,): Deps<Self>) -> Self {
         BEAM_NETWORKS.with_borrow_mut(|nets| nets.insert(T::broker_id()));
         fs::create_dir_all(conf.path.join("pki")).unwrap();
         BeamProxy {

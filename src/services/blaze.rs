@@ -25,9 +25,9 @@ where
 }
 
 impl<T: BlazeProvider> Service for Blaze<T> {
-    type Dependencies<'s> = (Traefik,);
+    type Dependencies = (Traefik,);
 
-    fn from_config(_conf: &crate::Config, (traefik,): super::Deps<'_, Self>) -> Self {
+    fn from_config(_conf: &crate::Config, (traefik,): super::Deps<Self>) -> Self {
         let traefik_conf = T::treafik_exposure();
         if let Some(conf) = &traefik_conf {
             traefik.add_basic_auth_user(conf.middleware_and_user_name.clone())

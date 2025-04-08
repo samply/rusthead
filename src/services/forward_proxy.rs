@@ -20,9 +20,9 @@ impl ForwardProxy {
 }
 
 impl Service for ForwardProxy {
-    type Dependencies<'s> = ();
+    type Dependencies = ();
 
-    fn from_config(conf: &crate::config::Config, _: super::Deps<'_, Self>) -> Self {
+    fn from_config(conf: &crate::config::Config, _: super::Deps<Self>) -> Self {
         Self {
             https_proxy_url: conf.https_proxy_url.clone(),
             trusted_ca_certs: conf.trusted_ca_certs(),

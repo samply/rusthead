@@ -43,13 +43,13 @@ pub struct DirectorySync<T: BlazeProvider> {
 }
 
 impl<T: BlazeProvider> Service for DirectorySync<T> {
-    type Dependencies<'a> = (Blaze<T>,);
+    type Dependencies = (Blaze<T>,);
 
     fn service_name() -> String {
         format!("{}-directory-sync", T::balze_service_name())
     }
 
-    fn from_config(conf: &crate::config::Config, (blaze,): Deps<'_, Self>) -> Self {
+    fn from_config(conf: &crate::config::Config, (blaze,): Deps<Self>) -> Self {
         let directory_sync_config = conf
             .bbmri
             .as_ref()

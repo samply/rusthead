@@ -32,9 +32,9 @@ impl Traefik {
 }
 
 impl Service for Traefik {
-    type Dependencies<'s> = ();
+    type Dependencies = ();
 
-    fn from_config(conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
+    fn from_config(conf: &crate::Config, _deps: super::Deps<Self>) -> Self {
         let tls_dir = conf.path.join("traefik-tls");
         fs::create_dir_all(&tls_dir).unwrap();
         Self {

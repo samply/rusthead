@@ -2,7 +2,7 @@ use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{config::Config, modules::CcpDefault};
 
-use super::{postgres::Postgres, ForwardProxy, Service, ToCompose, Traefik};
+use super::{ForwardProxy, Service, ToCompose, Traefik, postgres::Postgres};
 use askama::Template;
 use serde::Deserialize;
 use url::Url;
@@ -38,9 +38,9 @@ where
 }
 
 impl Service for IdManagement<CcpDefault> {
-    type Dependencies<'s> = (Traefik, ForwardProxy, Postgres<Self>);
+    type Dependencies = (Traefik, ForwardProxy, Postgres<Self>);
 
-    fn from_config(conf: &Config, (_traefik, fw_proxy, pg): super::Deps<'_, Self>) -> Self {
+    fn from_config(conf: &Config, (_traefik, fw_proxy, pg): super::Deps<Self>) -> Self {
         pg.user = "mainzelliste".into();
         pg.db = "mainzelliste".into();
         Self {

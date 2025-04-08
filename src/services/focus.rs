@@ -6,9 +6,9 @@ use url::Url;
 use crate::Config;
 
 use super::{
+    Deps, Service,
     beam::{BeamProxy, BrokerProvider},
     blaze::{Blaze, BlazeProvider},
-    Deps, Service,
 };
 
 #[derive(Debug, Template)]
@@ -27,9 +27,9 @@ where
 }
 
 impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
-    type Dependencies<'a> = (BeamProxy<T>, Blaze<B>);
+    type Dependencies = (BeamProxy<T>, Blaze<B>);
 
-    fn from_config(_conf: &Config, (beam_proxy, blaze): Deps<'_, Self>) -> Self
+    fn from_config(_conf: &Config, (beam_proxy, blaze): Deps<Self>) -> Self
     where
         Self: Sized,
     {

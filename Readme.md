@@ -23,9 +23,9 @@ struct MyService {
 }
 
 impl Service for MyService {
-    type Dependencies<'s> = (Traefik,);
+    type Dependencies = (Traefik,);
 
-    fn from_config(_conf: &crate::Config, _deps: super::Deps<'_, Self>) -> Self {
+    fn from_config(_conf: &crate::Config, _deps: super::Deps<Self>) -> Self {
         Self { some_prop: "foo".into() }
     }
 
