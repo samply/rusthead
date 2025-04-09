@@ -4,7 +4,7 @@ use askama::Template;
 use url::Url;
 
 use super::Service;
-use crate::utils::filters;
+use crate::{config::Config, utils::filters};
 
 #[derive(Debug, Template)]
 #[template(path = "forward_proxy.yml")]
@@ -21,8 +21,9 @@ impl ForwardProxy {
 
 impl Service for ForwardProxy {
     type Dependencies = ();
+    type ServiceConfig = Config;
 
-    fn from_config(conf: &crate::config::Config, _: super::Deps<Self>) -> Self {
+    fn from_config(conf: &Config, _: super::Deps<Self>) -> Self {
         Self {
             https_proxy_url: conf.https_proxy_url.clone(),
             trusted_ca_certs: conf.trusted_ca_certs(),

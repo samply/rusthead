@@ -2,7 +2,6 @@ use std::{
     any::{Any, TypeId},
     collections::HashMap,
     fs,
-    path::Path,
 };
 
 use anyhow::Context;
@@ -33,53 +32,43 @@ pub type Deps<'a, T> = <<T as Service>::Dependencies as ServiceTuple>::DepRefs<'
 // Could remove 'static bound by using dtolnay's typeid crate for the type map
 pub trait Service: ToCompose + 'static {
     type Dependencies: ServiceTuple;
+    type ServiceConfig;
 
-    fn from_config(conf: &Config, deps: Deps<Self>) -> Self;
+    fn from_config(conf: &Self::ServiceConfig, deps: Deps<Self>) -> Self;
 
     fn service_name() -> String;
-
-    fn get_or_create<'services>(
-        conf: &Config,
-        deps: &'services mut ServiceMap,
-    ) -> &'services mut Self
-    where
-        Self: Sized,
-    {
-        // Workaround for problem case #3
-        // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
-        if deps.contains::<Self>() {
-            return deps.get_mut().unwrap();
-        }
-        let this = Self::from_config(conf, Self::Dependencies::get_or_create(conf, deps));
-        deps.insert(this);
-        deps.get_mut().unwrap()
-    }
 }
 
 pub trait ServiceTuple {
     type DepRefs<'t>;
 
-    fn get_or_create<'service>(
-        conf: &Config,
-        services: &'service mut ServiceMap,
-    ) -> Self::DepRefs<'service>;
+    fn get<'services>(services: &'services mut ServiceMap) -> Option<Self::DepRefs<'services>>;
 }
 
 macro_rules! service_tuple {
     ($($ts:ident),*) => {
+        #[allow(unused, non_snake_case)]
         impl<$($ts: Service,)*> ServiceTuple for ($($ts,)*) {
             type DepRefs<'t> = ($(&'t mut $ts,)*);
 
-            #[allow(unused, non_snake_case)]
-            fn get_or_create<'service>(
-                conf: &Config,
-                services: &'service mut ServiceMap,
-            ) -> Self::DepRefs<'service> {
+            fn get<'services>(services: &'services mut ServiceMap) -> Option<Self::DepRefs<'services>> {
+                let [$($ts,)*] = services.map.get_disjoint_mut([
+                    $(&TypeId::of::<$ts>(),)*
+                ]);
+                // All services are guaranteed to be created at this point
+                Some(($(($ts?.as_mut() as &mut dyn Any).downcast_mut::<$ts>()?,)*))
+            }
+        }
+
+        #[allow(unused, non_snake_case)]
+        impl<$($ts: DefaultService,)*> DefaultServiceTuple for ($($ts,)*) {
+            fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services> {
                 // Ensure all services are created
                 $(
-                    $ts::get_or_create(conf, services);
+                    let service = $ts::from_default_config(services);
+                    services.insert(service);
                 )*
-                let [$($ts,)*] = services.0.get_disjoint_mut([
+                let [$($ts,)*] = services.map.get_disjoint_mut([
                     $(&TypeId::of::<$ts>(),)*
                 ]);
                 // All services are guaranteed to be created at this point
@@ -87,6 +76,43 @@ macro_rules! service_tuple {
             }
         }
     };
+}
+
+pub trait DefaultServiceTuple: ServiceTuple {
+    fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services>;
+}
+
+trait FromConfig {
+    fn from_default_config(conf: &Config) -> &Self;
+}
+
+impl FromConfig for Config {
+    fn from_default_config(conf: &Config) -> &Self {
+        conf
+    }
+}
+
+impl FromConfig for () {
+    fn from_default_config(_conf: &Config) -> &Self {
+        &()
+    }
+}
+
+trait DefaultService: Service {
+    fn from_default_config(service_map: &mut ServiceMap) -> Self;
+}
+
+impl<T> DefaultService for T
+where
+    T: Service,
+    T::ServiceConfig: FromConfig,
+    T::Dependencies: DefaultServiceTuple,
+{
+    fn from_default_config(service_map: &mut ServiceMap) -> Self {
+        let conf = T::ServiceConfig::from_default_config(service_map.config);
+        let deps = T::Dependencies::get_or_create(service_map);
+        T::from_config(conf, deps)
+    }
 }
 
 service_tuple!();
@@ -112,43 +138,87 @@ impl<T: Template + Service> ToCompose for T {
     }
 }
 
-#[derive(Default)]
-pub struct ServiceMap(HashMap<TypeId, Box<dyn ToCompose>>);
+pub struct ServiceMap {
+    map: HashMap<TypeId, Box<dyn ToCompose>>,
+    config: &'static Config,
+}
 
 impl std::fmt::Debug for ServiceMap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list().entries(self.0.keys()).finish()
+        f.debug_list().entries(self.map.keys()).finish()
     }
 }
 
 impl ServiceMap {
-    pub fn get_mut<T: ToCompose + Any>(&mut self) -> Option<&mut T> {
-        self.0
+    pub fn new(config: &'static Config) -> Self {
+        Self {
+            map: HashMap::new(),
+            config,
+        }
+    }
+
+    pub fn get_mut<T: Any>(&mut self) -> Option<&mut T> {
+        self.map
             .get_mut(&TypeId::of::<T>())
             .and_then(|v| (v.as_mut() as &mut dyn Any).downcast_mut::<T>())
     }
 
-    pub fn insert<T: ToCompose + Any>(&mut self, v: T) {
-        self.0.insert(TypeId::of::<T>(), Box::new(v));
-    }
-
     pub fn contains<T: ToCompose + Any>(&self) -> bool {
-        self.0.contains_key(&TypeId::of::<T>())
+        self.map.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn install<T: Service>(&mut self, conf: &Config) -> &mut T {
-        T::get_or_create(conf, self)
+    #[must_use = "Ensure that the service actually got installed because all its deps were already installed"]
+    pub fn install_with_config_cached_deps<T: Service>(
+        &mut self,
+        conf: &T::ServiceConfig,
+    ) -> &mut T {
+        // Workaround for problem case #3
+        // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
+        if self.contains::<T>() {
+            return self.get_mut().unwrap();
+        }
+        let s = T::from_config(conf, T::Dependencies::get(self).unwrap());
+        self.insert(s)
     }
 
-    pub fn install_module<M: Module>(&mut self, m: M, conf: &Config) {
-        m.install(self, conf);
+    pub fn install_with_config<T>(&mut self, conf: &T::ServiceConfig) -> &mut T
+    where
+        T: Service,
+        T::Dependencies: DefaultServiceTuple,
+    {
+        // Workaround for problem case #3
+        // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
+        if self.contains::<T>() {
+            return self.get_mut().unwrap();
+        }
+        let s = T::from_config(conf, T::Dependencies::get_or_create(self));
+        self.insert(s)
     }
 
-    pub fn write_composables(&self, srv_dir: impl AsRef<Path>) -> anyhow::Result<()> {
-        let services_dir = srv_dir.as_ref().join("services");
+    fn insert<T: Service>(&mut self, s: T) -> &mut T {
+        self.map.insert(TypeId::of::<T>(), Box::new(s));
+        self.get_mut().unwrap()
+    }
+
+    pub fn install_default<T: DefaultService>(&mut self) -> &mut T {
+        // Workaround for problem case #3
+        // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
+        if self.contains::<T>() {
+            return self.get_mut().unwrap();
+        }
+        let s = T::from_default_config(self);
+        self.insert(s)
+    }
+
+    pub fn install_module<M: Module>(&mut self, m: M) {
+        m.install(self, &self.config);
+    }
+
+    pub fn write_composables(&self) -> anyhow::Result<()> {
+        let services_dir = self.config.srv_dir.join("services");
         _ = fs::remove_dir_all(&services_dir);
         fs::create_dir_all(&services_dir)?;
-        for service in self.0.values() {
+        for service in self.map.values() {
             fs::write(
                 services_dir.join(format!("{}.yml", service.service_name())),
                 service.render()?,

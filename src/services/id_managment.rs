@@ -39,6 +39,7 @@ where
 
 impl Service for IdManagement<CcpDefault> {
     type Dependencies = (Traefik, ForwardProxy, Postgres<Self>);
+    type ServiceConfig = Config;
 
     fn from_config(conf: &Config, (_traefik, fw_proxy, pg): super::Deps<Self>) -> Self {
         pg.user = "mainzelliste".into();

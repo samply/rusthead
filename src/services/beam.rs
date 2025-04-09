@@ -54,6 +54,7 @@ impl<T: BrokerProvider> BeamProxy<T> {
 
 impl<T: BrokerProvider> Service for BeamProxy<T> {
     type Dependencies = (ForwardProxy,);
+    type ServiceConfig = Config;
 
     fn from_config(conf: &Config, (fw_proxy,): Deps<Self>) -> Self {
         BEAM_NETWORKS.with_borrow_mut(|nets| nets.insert(T::broker_id()));

@@ -44,20 +44,16 @@ pub struct DirectorySync<T: BlazeProvider> {
 
 impl<T: BlazeProvider> Service for DirectorySync<T> {
     type Dependencies = (Blaze<T>,);
+    type ServiceConfig = DirectorySyncConfig;
 
     fn service_name() -> String {
         format!("{}-directory-sync", T::balze_service_name())
     }
 
-    fn from_config(conf: &crate::config::Config, (blaze,): Deps<Self>) -> Self {
-        let directory_sync_config = conf
-            .bbmri
-            .as_ref()
-            .and_then(|bbmri_conf| bbmri_conf.directory_sync.as_ref())
-            .unwrap();
+    fn from_config(conf: &Self::ServiceConfig, (blaze,): Deps<Self>) -> Self {
         DirectorySync {
             blaze_url: blaze.get_url(),
-            conf: directory_sync_config.clone(),
+            conf: conf.clone(),
             blaze_provider: PhantomData,
         }
     }
