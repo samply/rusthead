@@ -1,6 +1,6 @@
 services:
   {{ Self::service_name() }}:
-    image: docker.verbis.dkfz.de/cache/samply/focus:develop-dktk
+    image: docker.verbis.dkfz.de/cache/samply/focus:{{ tag }}
     environment:
       BEAM_APP_ID_LONG: {{ beam_id }}
       BEAM_PROXY_URL: {{ beam_url }}

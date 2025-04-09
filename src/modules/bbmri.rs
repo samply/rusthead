@@ -22,17 +22,15 @@ impl Module for Bbmri {
         let Some(bbmri_conf) = conf.bbmri.as_ref() else {
             return;
         };
-        service_map.install::<Blaze<Self>>(conf);
+        service_map.install_default::<Blaze<Self>>();
         if bbmri_conf.eric {
-            let focus = service_map.install::<Focus<Eric, Blaze<Self>>>(conf);
-            focus.tag = "main-bbmri".into();
+            service_map.install_with_config::<Focus<Eric, Blaze<Self>>>(&"main-bbmri".into());
         }
         if bbmri_conf.gbn {
-            let focus = service_map.install::<Focus<Gbn, Blaze<Self>>>(conf);
-            focus.tag = "main-bbmri".into();
+            service_map.install_with_config::<Focus<Gbn, Blaze<Self>>>(&"main-bbmri".into());
         }
-        if bbmri_conf.directory_sync.is_some() {
-            service_map.install::<crate::services::DirectorySync<Self>>(conf);
+        if let Some(ds_conf) = &bbmri_conf.directory_sync {
+            service_map.install_with_config::<crate::services::DirectorySync<Self>>(ds_conf);
         }
     }
 }

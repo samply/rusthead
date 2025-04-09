@@ -23,10 +23,9 @@ impl Module for CcpDefault {
         let Some(ccp_conf) = conf.ccp.as_ref() else {
             return;
         };
-        let focus = service_map.install::<Focus<Self, Blaze<Self>>>(conf);
-        focus.tag = "main-dktk".into();
+        service_map.install_with_config::<Focus<Self, Blaze<Self>>>(&"main-dktk".into());
         if ccp_conf.id_manager.is_some() {
-            service_map.install::<IdManagement<Self>>(conf);
+            service_map.install_default::<IdManagement<Self>>();
         }
     }
 }

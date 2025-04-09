@@ -18,13 +18,14 @@ where
 
 impl<T: Service> Service for Postgres<T> {
     type Dependencies = ();
+    type ServiceConfig = crate::Config;
 
-    fn from_config(_conf: &crate::config::Config, _deps: super::Deps<Self>) -> Self {
+    fn from_config(conf: &Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
         Self {
             r#for: PhantomData,
             user: <T as Service>::service_name(),
             db: <T as Service>::service_name(),
-            password: _conf.local_conf.borrow().generate_secret::<10>(),
+            password: conf.local_conf.borrow().generate_secret::<10>(),
         }
     }
 

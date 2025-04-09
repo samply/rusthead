@@ -36,12 +36,13 @@ fn main() -> anyhow::Result<()> {
     };
     let conf = Config::load(&conf_path)
         .with_context(|| format!("Failed to load config from {conf_path:?}"))?;
-    let mut services = ServiceMap::default();
+    let conf: &'static _ = Box::leak(Box::new(conf));
+    let mut services = ServiceMap::new(conf);
     modules::MODULES
         .iter()
-        .for_each(|&m| services.install_module(m, &conf));
+        .for_each(|&m| services.install_module(m));
     services
-        .write_composables(&conf.srv_dir)
+        .write_composables()
         .context("Failed to write services")?;
     Bridgehead::new(&conf).write()?;
     conf.write_local_conf()?;
