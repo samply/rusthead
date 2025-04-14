@@ -16,11 +16,11 @@ services:
     secrets:
       - proxy.pem
     configs:
-      - source: root.crt.pem
+      - source: {{ T::network_name() }}.root.crt.pem
         target: /conf/root.crt.pem
 
 configs:
-  root.crt.pem:
+  {{ T::network_name() }}.root.crt.pem:
     content: |
       {{ T::root_cert()|indent(6) }}
 
