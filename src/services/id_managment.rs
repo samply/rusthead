@@ -28,9 +28,9 @@ where
     project: PhantomData<Project>,
     id: String,
     hostname: String,
-    site_id: String,
+    site_id: &'static str,
     oidc_url: Url,
-    conf: IdManagementConfig,
+    conf: &'static IdManagementConfig,
     local_apikey: String,
     postgres_pw: String,
     fw_proxy_url: Url,
@@ -39,16 +39,19 @@ where
 
 impl Service for IdManagement<CcpDefault> {
     type Dependencies = (Traefik, ForwardProxy, Postgres<Self>);
-    type ServiceConfig = Config;
+    type ServiceConfig = (&'static IdManagementConfig, &'static Config);
 
-    fn from_config(conf: &Config, (_traefik, fw_proxy, pg): super::Deps<Self>) -> Self {
+    fn from_config(
+        (idm_conf, conf): Self::ServiceConfig,
+        (_traefik, fw_proxy, pg): super::Deps<Self>,
+    ) -> Self {
         pg.user = "mainzelliste".into();
         pg.db = "mainzelliste".into();
         Self {
             id: legacy_id_mapping(&conf.site_id),
             hostname: conf.hostname.to_string(),
-            site_id: conf.site_id.clone(),
-            conf: conf.ccp.as_ref().unwrap().id_manager.clone().unwrap(),
+            site_id: &conf.site_id,
+            conf: idm_conf,
             fw_proxy_url: fw_proxy.get_url(),
             fw_proxy_name: fw_proxy.service_name(),
             oidc_url: "https://login.verbis.dkfz.de/realms/master"

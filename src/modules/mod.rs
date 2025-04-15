@@ -1,16 +1,16 @@
 mod bbmri;
 mod ccp;
 
+use crate::{Config, services::ServiceMap};
 pub use bbmri::BbmriConfig;
 pub use ccp::{CcpConfig, CcpDefault};
-use crate::{services::ServiceMap, Config};
 
 pub trait Module {
-    fn install(&self, service_map: &mut ServiceMap, conf: &Config);
+    fn install(&self, service_map: &mut ServiceMap, conf: &'static Config);
 }
 
 impl Module for &dyn Module {
-    fn install(&self, service_map: &mut ServiceMap, conf: &Config) {
+    fn install(&self, service_map: &mut ServiceMap, conf: &'static Config) {
         (*self).install(service_map, conf);
     }
 }

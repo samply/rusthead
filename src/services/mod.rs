@@ -34,7 +34,7 @@ pub trait Service: ToCompose + 'static {
     type Dependencies: ServiceTuple;
     type ServiceConfig;
 
-    fn from_config(conf: &Self::ServiceConfig, deps: Deps<Self>) -> Self;
+    fn from_config(conf: Self::ServiceConfig, deps: Deps<Self>) -> Self;
 
     fn service_name() -> String;
 }
@@ -83,22 +83,22 @@ pub trait DefaultServiceTuple: ServiceTuple {
 }
 
 trait FromConfig {
-    fn from_default_config(conf: &Config) -> &Self;
+    fn from_default_config(conf: &'static Config) -> Self;
 }
 
-impl FromConfig for Config {
-    fn from_default_config(conf: &Config) -> &Self {
+impl FromConfig for &'static Config {
+    fn from_default_config(conf: &'static Config) -> Self {
         conf
     }
 }
 
 impl FromConfig for () {
-    fn from_default_config(_conf: &Config) -> &Self {
-        &()
+    fn from_default_config(_conf: &Config) -> Self {
+        ()
     }
 }
 
-trait DefaultService: Service {
+pub trait DefaultService: Service {
     fn from_default_config(service_map: &mut ServiceMap) -> Self;
 }
 
@@ -170,7 +170,7 @@ impl ServiceMap {
     #[must_use = "Ensure that the service actually got installed because all its deps were already installed"]
     pub fn install_with_config_cached_deps<T: Service>(
         &mut self,
-        conf: &T::ServiceConfig,
+        conf: T::ServiceConfig,
     ) -> &mut T {
         // Workaround for problem case #3
         // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
@@ -181,7 +181,7 @@ impl ServiceMap {
         self.insert(s)
     }
 
-    pub fn install_with_config<T>(&mut self, conf: &T::ServiceConfig) -> &mut T
+    pub fn install_with_config<T>(&mut self, conf: T::ServiceConfig) -> &mut T
     where
         T: Service,
         T::Dependencies: DefaultServiceTuple,

@@ -21,9 +21,9 @@ impl ForwardProxy {
 
 impl Service for ForwardProxy {
     type Dependencies = ();
-    type ServiceConfig = Config;
+    type ServiceConfig = &'static Config;
 
-    fn from_config(conf: &Config, _: super::Deps<Self>) -> Self {
+    fn from_config(conf: Self::ServiceConfig, _: super::Deps<Self>) -> Self {
         Self {
             https_proxy_url: conf.https_proxy_url.clone(),
             trusted_ca_certs: conf.trusted_ca_certs(),

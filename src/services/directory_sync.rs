@@ -44,13 +44,13 @@ pub struct DirectorySync<T: BlazeProvider> {
 
 impl<T: BlazeProvider> Service for DirectorySync<T> {
     type Dependencies = (Blaze<T>,);
-    type ServiceConfig = DirectorySyncConfig;
+    type ServiceConfig = &'static DirectorySyncConfig;
 
     fn service_name() -> String {
         format!("{}-directory-sync", T::balze_service_name())
     }
 
-    fn from_config(conf: &Self::ServiceConfig, (blaze,): Deps<Self>) -> Self {
+    fn from_config(conf: Self::ServiceConfig, (blaze,): Deps<Self>) -> Self {
         DirectorySync {
             blaze_url: blaze.get_url(),
             conf: conf.clone(),

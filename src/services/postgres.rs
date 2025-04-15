@@ -18,9 +18,9 @@ where
 
 impl<T: Service> Service for Postgres<T> {
     type Dependencies = ();
-    type ServiceConfig = crate::Config;
+    type ServiceConfig = &'static crate::Config;
 
-    fn from_config(conf: &Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
+    fn from_config(conf: Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
         Self {
             r#for: PhantomData,
             user: <T as Service>::service_name(),
