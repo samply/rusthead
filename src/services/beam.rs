@@ -4,7 +4,6 @@ use std::{
     fs,
     marker::PhantomData,
     path::PathBuf,
-    rc::Rc,
     str::FromStr,
 };
 
@@ -34,7 +33,7 @@ pub struct BeamProxy<T: BrokerProvider> {
     pub trusted_ca_certs: PathBuf,
     app_keys: HashMap<&'static str, String>,
     fw_proxy_url: Url,
-    local_conf: Rc<RefCell<LocalConf>>,
+    local_conf: &'static RefCell<LocalConf>,
 }
 
 impl<T: BrokerProvider> BeamProxy<T> {
@@ -54,9 +53,9 @@ impl<T: BrokerProvider> BeamProxy<T> {
 
 impl<T: BrokerProvider> Service for BeamProxy<T> {
     type Dependencies = (ForwardProxy,);
-    type ServiceConfig = Config;
+    type ServiceConfig = &'static Config;
 
-    fn from_config(conf: &Config, (fw_proxy,): Deps<Self>) -> Self {
+    fn from_config(conf: Self::ServiceConfig, (fw_proxy,): Deps<Self>) -> Self {
         BEAM_NETWORKS.with_borrow_mut(|nets| nets.insert(T::broker_id()));
         fs::create_dir_all(conf.path.join("pki")).unwrap();
         BeamProxy {
@@ -66,7 +65,7 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
             app_keys: Default::default(),
             fw_proxy_url: fw_proxy.get_url(),
             trusted_ca_certs: conf.trusted_ca_certs(),
-            local_conf: conf.local_conf.clone(),
+            local_conf: &conf.local_conf,
         }
     }
 

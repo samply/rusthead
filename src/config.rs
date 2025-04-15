@@ -4,11 +4,10 @@ use std::{
     fs,
     ops::Deref,
     path::PathBuf,
-    rc::Rc,
     sync::{Mutex, OnceLock},
 };
 
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
@@ -32,7 +31,7 @@ pub struct Config {
     pub path: PathBuf,
 
     #[serde(skip)]
-    pub local_conf: Rc<RefCell<LocalConf>>,
+    pub local_conf: RefCell<LocalConf>,
 }
 
 fn default_srv_dir() -> PathBuf {
@@ -59,7 +58,7 @@ impl Config {
                 eprintln!("Failed to read local config creating a new one");
                 LocalConf::default()
             });
-        conf.local_conf = Rc::new(RefCell::new(local_conf));
+        conf.local_conf = RefCell::new(local_conf);
         Ok(conf)
     }
 

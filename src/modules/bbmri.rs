@@ -18,16 +18,20 @@ pub struct BbmriConfig {
 pub struct Bbmri;
 
 impl Module for Bbmri {
-    fn install(&self, service_map: &mut crate::services::ServiceMap, conf: &crate::config::Config) {
+    fn install(
+        &self,
+        service_map: &mut crate::services::ServiceMap,
+        conf: &'static crate::config::Config,
+    ) {
         let Some(bbmri_conf) = conf.bbmri.as_ref() else {
             return;
         };
         service_map.install_default::<Blaze<Self>>();
         if bbmri_conf.eric {
-            service_map.install_with_config::<Focus<Eric, Blaze<Self>>>(&"main-bbmri".into());
+            service_map.install_with_config::<Focus<Eric, Blaze<Self>>>("main-bbmri".into());
         }
         if bbmri_conf.gbn {
-            service_map.install_with_config::<Focus<Gbn, Blaze<Self>>>(&"main-bbmri".into());
+            service_map.install_with_config::<Focus<Gbn, Blaze<Self>>>("main-bbmri".into());
         }
         if let Some(ds_conf) = &bbmri_conf.directory_sync {
             service_map.install_with_config::<crate::services::DirectorySync<Self>>(ds_conf);

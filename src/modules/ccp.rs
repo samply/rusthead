@@ -19,13 +19,13 @@ pub struct CcpConfig {
 pub struct CcpDefault;
 
 impl Module for CcpDefault {
-    fn install(&self, service_map: &mut ServiceMap, conf: &crate::Config) {
+    fn install(&self, service_map: &mut ServiceMap, conf: &'static crate::Config) {
         let Some(ccp_conf) = conf.ccp.as_ref() else {
             return;
         };
-        service_map.install_with_config::<Focus<Self, Blaze<Self>>>(&"main-dktk".into());
-        if ccp_conf.id_manager.is_some() {
-            service_map.install_default::<IdManagement<Self>>();
+        service_map.install_with_config::<Focus<Self, Blaze<Self>>>("main-dktk".into());
+        if let Some(idm_conf) = &ccp_conf.id_manager {
+            service_map.install_with_config::<IdManagement<Self>>((idm_conf, conf));
         }
     }
 }

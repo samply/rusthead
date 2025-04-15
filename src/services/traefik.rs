@@ -1,4 +1,4 @@
-use std::{cell::RefCell, fs, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, fs, path::PathBuf};
 
 use askama::Template;
 use bcrypt::DEFAULT_COST;
@@ -12,7 +12,7 @@ use super::Service;
 #[template(path = "traefik.yml")]
 pub struct Traefik {
     tls_dir: PathBuf,
-    local_conf: Rc<RefCell<LocalConf>>,
+    local_conf: &'static RefCell<LocalConf>,
 }
 
 impl Traefik {
@@ -33,14 +33,14 @@ impl Traefik {
 
 impl Service for Traefik {
     type Dependencies = ();
-    type ServiceConfig = crate::Config;
+    type ServiceConfig = &'static crate::Config;
 
-    fn from_config(conf: &Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
+    fn from_config(conf: Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
         let tls_dir = conf.path.join("traefik-tls");
         fs::create_dir_all(&tls_dir).unwrap();
         Self {
             tls_dir,
-            local_conf: conf.local_conf.clone(),
+            local_conf: &conf.local_conf,
         }
     }
 

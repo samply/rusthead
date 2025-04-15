@@ -5,7 +5,6 @@ use std::{
     fs,
     marker::PhantomData,
     process::Command,
-    rc::Rc,
 };
 
 use anyhow::bail;
@@ -22,12 +21,12 @@ pub struct OidcClient<T: OidcProvider> {
     http_proxy_url: Option<Url>,
     pub_redirect_paths: Vec<String>,
     priv_redirect_urls: Vec<String>,
-    local_conf: Rc<RefCell<LocalConf>>,
+    local_conf: &'static RefCell<LocalConf>,
     synced: bool,
 }
 
 impl<T: OidcProvider> OidcClient<T> {
-    fn new(conf: &Config) -> Self {
+    fn new(conf: &'static Config) -> Self {
         let mut dummy_fw_proxy = ForwardProxy::from_config(conf, ());
         let beam_proxy = BeamProxy::from_config(conf, (&mut dummy_fw_proxy,));
         let proxy_url = dummy_fw_proxy.https_proxy_url;
@@ -37,7 +36,7 @@ impl<T: OidcProvider> OidcClient<T> {
             pub_redirect_paths: Default::default(),
             priv_redirect_urls: Default::default(),
             http_proxy_url: proxy_url,
-            local_conf: conf.local_conf.clone(),
+            local_conf: &conf.local_conf,
             synced: false,
         }
     }
@@ -48,7 +47,7 @@ thread_local! {
 }
 
 impl<T: OidcProvider> OidcClient<T> {
-    pub fn add_public_redirect_path(conf: &Config, path: &str) -> PublicOidcClient<T> {
+    pub fn add_public_redirect_path(conf: &'static Config, path: &str) -> PublicOidcClient<T> {
         OIDC_CLIENTS.with_borrow_mut(|m| {
             m.entry(TypeId::of::<T>())
                 .or_insert_with(|| Box::new(Self::new(conf)))
@@ -63,7 +62,7 @@ impl<T: OidcProvider> OidcClient<T> {
         }
     }
 
-    pub fn add_private_redirect_path(conf: &Config, path: &str) -> PrivateOidcClient<T> {
+    pub fn add_private_redirect_path(conf: &'static Config, path: &str) -> PrivateOidcClient<T> {
         OIDC_CLIENTS.with_borrow_mut(|m| {
             m.entry(TypeId::of::<T>())
                 .or_insert_with(|| Box::new(Self::new(conf)))
@@ -148,7 +147,7 @@ impl<T: OidcProvider> OidcClient<T> {
         Ok(())
     }
 
-    fn evaluate() -> Rc<RefCell<LocalConf>> {
+    fn evaluate() -> &'static RefCell<LocalConf> {
         OIDC_CLIENTS.with_borrow_mut(|m| {
             let client_spec = m
                 .get_mut(&TypeId::of::<T>())
@@ -161,7 +160,7 @@ impl<T: OidcProvider> OidcClient<T> {
                     T::oidc_provider_id()
                 );
             }
-            client_spec.local_conf.clone()
+            client_spec.local_conf
         })
     }
 }

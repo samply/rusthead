@@ -28,7 +28,7 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
     type Dependencies = (BeamProxy<T>, Blaze<B>);
     type ServiceConfig = String;
 
-    fn from_config(tag: &Self::ServiceConfig, (beam_proxy, blaze): Deps<Self>) -> Self
+    fn from_config(tag: Self::ServiceConfig, (beam_proxy, blaze): Deps<Self>) -> Self
     where
         Self: Sized,
     {
