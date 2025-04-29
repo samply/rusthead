@@ -6,7 +6,9 @@ pub const fn enabled() -> bool {
 pub mod filters {
     use std::path::PathBuf;
 
-    pub fn path(p: &PathBuf) -> askama::Result<String> {
+    use askama::Values;
+
+    pub fn path(p: &PathBuf, _: &dyn Values) -> askama::Result<String> {
         Ok(p.canonicalize()
             .map_err(|e| {
                 askama::Error::custom(

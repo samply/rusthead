@@ -2,8 +2,8 @@
 set -e
 set -o pipefail
 
-{%- let config_dir = filters::path(conf.path)? %}
-{%- let pwd = filters::path(conf.srv_dir)? %}
+{%- let config_dir = conf.path|path %}
+{%- let pwd = conf.srv_dir|path %}
 {%- let priv_key_file = conf.path.join(format!("pki/{}.priv.pem", self.conf.site_id)) %}
 cd {{ pwd }}
 
