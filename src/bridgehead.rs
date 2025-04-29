@@ -9,13 +9,13 @@ use crate::{config::Config, services::BEAM_NETWORKS, utils::filters};
 
 #[derive(Debug, Template)]
 #[template(path = "bridgehead")]
-pub struct Bridgehead<'c> {
+pub struct Bridgehead {
     beam_networks: HashSet<String>,
-    conf: &'c Config,
+    conf: &'static Config,
 }
 
-impl<'c> Bridgehead<'c> {
-    pub fn new(conf: &'c Config) -> Self {
+impl Bridgehead {
+    pub fn new(conf: &'static Config) -> Self {
         Self {
             beam_networks: BEAM_NETWORKS.take(),
             conf,
