@@ -18,13 +18,13 @@ pub struct Traefik {
 impl Traefik {
     // TODO: persist to some local.config.toml or smth maybe with toml_edit
     pub fn add_basic_auth_user(&mut self, middleware_name: String) {
-        self.local_conf
-            .borrow_mut()
+        let mut local_conf = self.local_conf.borrow_mut();
+        let pw = local_conf.generate_secret::<10>();
+        local_conf
             .basic_auth_users
             .get_or_insert_default()
             .entry(middleware_name)
             .or_insert_with(|| {
-                let pw = self.local_conf.borrow().generate_secret::<10>();
                 let hash = bcrypt::hash(&pw, DEFAULT_COST).unwrap();
                 BasicAuthUser { hash, pw: Some(pw) }
             });
