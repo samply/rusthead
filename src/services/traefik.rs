@@ -2,6 +2,7 @@ use std::{cell::RefCell, fs, path::PathBuf};
 
 use askama::Template;
 use bcrypt::DEFAULT_COST;
+use rcgen::CertifiedKey;
 use serde::{Deserialize, Serialize};
 
 use crate::{config::LocalConf, utils::filters};
@@ -38,6 +39,29 @@ impl Service for Traefik {
     fn from_config(conf: Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
         let tls_dir = conf.path.join("traefik-tls");
         fs::create_dir_all(&tls_dir).unwrap();
+        let full_chain = tls_dir.join("fullchain.pem");
+        let priv_key = tls_dir.join("privkey.pem");
+        match (
+            fs::exists(&full_chain).unwrap(),
+            fs::exists(&priv_key).unwrap(),
+        ) {
+            (false, false) => {
+                eprintln!(
+                    "No ssl certs found for traefik in {tls_dir:?}. Generating self-signed certificate"
+                );
+                let CertifiedKey { cert, key_pair } =
+                    rcgen::generate_simple_self_signed(vec![conf.hostname.to_string()]).unwrap();
+                fs::write(full_chain, cert.pem()).unwrap();
+                fs::write(priv_key, key_pair.serialize_pem()).unwrap();
+            }
+            (true, false) => {
+                panic!("fullchain.pem exists but privkey.pem does not");
+            }
+            (false, true) => {
+                panic!("privkey.pem exists but fullchain.pem does not");
+            }
+            (true, true) => {}
+        }
         Self {
             tls_dir,
             local_conf: &conf.local_conf,
