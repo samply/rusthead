@@ -83,12 +83,12 @@ impl Config {
 #[serde(deny_unknown_fields)]
 pub struct LocalConf {
     #[serde(default = "generate_seed")]
-    pub seed: u64,
+    pub seed: u32,
     pub oidc: Option<HashMap<String, String>>,
     pub basic_auth_users: Option<HashMap<String, BasicAuthUser>>,
 }
 
-fn generate_seed() -> u64 {
+fn generate_seed() -> u32 {
     rand::rng().random()
 }
 
@@ -106,7 +106,7 @@ impl LocalConf {
     pub fn generate_secret<const N: usize>(&self) -> String {
         static RNG: OnceLock<Mutex<StdRng>> = OnceLock::new();
         let mut rng = RNG
-            .get_or_init(|| StdRng::seed_from_u64(self.seed).into())
+            .get_or_init(|| StdRng::seed_from_u64(self.seed as u64).into())
             .lock()
             .unwrap();
         const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
