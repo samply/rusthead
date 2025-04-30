@@ -79,7 +79,7 @@ impl Config {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Default)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LocalConf {
     #[serde(default = "generate_seed")]
@@ -90,6 +90,16 @@ pub struct LocalConf {
 
 fn generate_seed() -> u64 {
     rand::rng().random()
+}
+
+impl Default for LocalConf {
+    fn default() -> Self {
+        LocalConf {
+            seed: generate_seed(),
+            oidc: None,
+            basic_auth_users: None,
+        }
+    }
 }
 
 impl LocalConf {
