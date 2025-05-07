@@ -7,7 +7,7 @@ A tool for generating a number of docker compose files based on some configurati
 
 1. Add a file to `src/services` and add it to the `mod.rs`.
 2. Create a struct with all parameters for the service.
-3. Implement the `Service` trait for your struct. The trait expects an associated type which is always a tuple of things that implement `Service` (`()` for no deps or `(Service1,)` for a single dependency). You will get mutable references to your dependencies in the `from_config` method which you can use to construct your service. For the `service_name` method it is important to generate a unique name especially if your service is generic you need to make sure it generates different service names for different generic parameters in order to prevent name collisions in the generated docker compose files. See [service example](#service-example).
+3. Implement the `Service` trait for your struct. The trait expects two associated types. `Dependencies` is always a tuple of things that implement `Service` (`()` for no deps or `(Service1,)` for a single dependency). `ServiceConfig` is can be a `&'static Config` if your service does not need any specific configuration but you can set it to your custom type. You will get mutable references to your dependencies in the `from_config` method which you can use to construct your service. For the `service_name` method it is important to generate a unique name especially if your service is generic! You need to make sure it generates different service names for different generic parameters in order to prevent name collisions in the generated docker compose files. See [service example](#service-example).
 4. Derive the `Template` trait and add a template to `templates/`. See the [example](#template-example) for more details.
 5. For your service to be loaded it needs to be installed by a `Module` as described [here](#adding-a-module).
 
@@ -24,8 +24,9 @@ struct MyService {
 
 impl Service for MyService {
     type Dependencies = (Traefik,);
+    type ServiceConfig = &'static Config;
 
-    fn from_config(_conf: &crate::Config, _deps: super::Deps<Self>) -> Self {
+    fn from_config(_conf: Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
         Self { some_prop: "foo".into() }
     }
 
