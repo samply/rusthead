@@ -4,8 +4,7 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::services::{
-    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, IdManagement,
-    IdManagementConfig, OidcProvider, ServiceMap,
+    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, IdManagement, IdManagementConfig, OidcProvider, ServiceMap, Transfair, TransfairConfig
 };
 
 use super::Module;
@@ -14,6 +13,7 @@ use super::Module;
 #[serde(deny_unknown_fields)]
 pub struct CcpConfig {
     pub id_manager: Option<IdManagementConfig>,
+    pub transfair: Option<TransfairConfig>,
 }
 
 pub struct CcpDefault;
@@ -26,6 +26,9 @@ impl Module for CcpDefault {
         service_map.install_with_config::<Focus<Self, Blaze<Self>>>("main-dktk".into());
         if let Some(idm_conf) = &ccp_conf.id_manager {
             service_map.install_with_config::<IdManagement<Self>>((idm_conf, conf));
+        }
+        if let Some(transfair_conf) = &ccp_conf.transfair {
+            service_map.install_with_config::<Transfair<Self>>((transfair_conf, conf));
         }
     }
 }

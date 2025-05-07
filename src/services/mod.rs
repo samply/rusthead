@@ -9,8 +9,10 @@ use askama::Template;
 
 use crate::{Config, modules::Module};
 
-mod id_managment;
 mod postgres;
+mod transfair;
+pub use transfair::*;
+mod id_managment;
 pub use id_managment::*;
 mod directory_sync;
 pub use directory_sync::*;
