@@ -1,5 +1,6 @@
 use serde::Deserialize;
 
+use crate::config::Environment;
 use crate::services::{Blaze, BlazeProvider, BrokerProvider, DirectorySyncConfig, Focus};
 use crate::utils::enabled;
 
@@ -28,6 +29,11 @@ impl Module for Bbmri {
         };
         service_map.install_default::<Blaze<Self>>();
         if bbmri_conf.eric {
+            if let Environment::Acceptance = conf.environment {
+                service_map.install_with_config::<Focus<EricAcc, Blaze<Self>>>("main-bbmri".into());
+            } else {
+                service_map.install_with_config::<Focus<Eric, Blaze<Self>>>("main-bbmri".into());
+            }
             service_map.install_with_config::<Focus<Eric, Blaze<Self>>>("main-bbmri".into());
         }
         if bbmri_conf.gbn {
@@ -81,5 +87,21 @@ impl BrokerProvider for Gbn {
 
     fn root_cert() -> &'static str {
         include_str!("../../static/beam/gbn.root.crt.pem")
+    }
+}
+
+struct EricAcc;
+
+impl BrokerProvider for EricAcc {
+    fn broker_url() -> url::Url {
+        "https://broker-acc.bbmri-acc.samply.de".parse().unwrap()
+    }
+
+    fn network_name() -> &'static str {
+        "eric-acc"
+    }
+
+    fn root_cert() -> &'static str {
+        include_str!("../../static/beam/bbmri.acc.root.crt.pem")
     }
 }

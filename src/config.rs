@@ -22,6 +22,8 @@ pub struct Config {
     pub site_id: String,
     #[serde(with = "crate::utils::host")]
     pub hostname: Host,
+    #[serde(default)]
+    pub environment: Environment,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
@@ -32,6 +34,15 @@ pub struct Config {
 
     #[serde(skip)]
     pub local_conf: RefCell<LocalConf>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Environment {
+    #[default]
+    Production,
+    Acceptance,
+    Test,
 }
 
 fn default_srv_dir() -> PathBuf {
