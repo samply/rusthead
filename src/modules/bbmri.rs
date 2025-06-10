@@ -34,7 +34,6 @@ impl Module for Bbmri {
             } else {
                 service_map.install_with_config::<Focus<Eric, Blaze<Self>>>("main-bbmri".into());
             }
-            service_map.install_with_config::<Focus<Eric, Blaze<Self>>>("main-bbmri".into());
         }
         if bbmri_conf.gbn {
             service_map.install_with_config::<Focus<Gbn, Blaze<Self>>>("main-bbmri".into());
