@@ -85,7 +85,10 @@ enroll() {
 {%- endif %}
 
 install_systemd() {
-    [ ! systemctl list-units &> /dev/null ] || echo "Systemd is not active. Skipping systemd setup." && return
+    if ! systemctl list-units &> /dev/null; then
+        echo "Systemd is not active. Skipping systemd setup."
+        return
+    fi
     cat <<EOF > /etc/systemd/system/bridgehead.service
 [Unit]
 Description=Bridgehead Service
