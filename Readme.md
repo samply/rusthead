@@ -3,7 +3,7 @@
 
 A tool for generating a number of docker compose files based on some configuration taking into account dependency resolution and deduplication.
 
-## Adding a service
+## Adding a serviceasfd
 
 1. Add a file to `src/services` and add it to the `mod.rs`.
 2. Create a struct with all parameters for the service.
