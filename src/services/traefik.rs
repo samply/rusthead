@@ -49,10 +49,10 @@ impl Service for Traefik {
                 eprintln!(
                     "No ssl certs found for traefik in {tls_dir:?}. Generating self-signed certificate"
                 );
-                let CertifiedKey { cert, key_pair } =
+                let CertifiedKey { cert, signing_key } =
                     rcgen::generate_simple_self_signed(vec![conf.hostname.to_string()]).unwrap();
                 fs::write(full_chain, cert.pem()).unwrap();
-                fs::write(priv_key, key_pair.serialize_pem()).unwrap();
+                fs::write(priv_key, signing_key.serialize_pem()).unwrap();
             }
             (true, false) => {
                 panic!("fullchain.pem exists but privkey.pem does not");
