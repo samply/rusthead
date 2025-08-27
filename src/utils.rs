@@ -3,6 +3,17 @@ pub const fn enabled() -> bool {
     true
 }
 
+pub fn capitalize_first_letter(s: &str) -> String {
+    let mut chars = s.chars();
+    chars
+        .next()
+        .map(char::to_uppercase)
+        .into_iter()
+        .flatten()
+        .chain(chars)
+        .collect()
+}
+
 pub mod filters {
     use std::path::PathBuf;
 

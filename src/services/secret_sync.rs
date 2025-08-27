@@ -3,7 +3,6 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fs,
-    marker::PhantomData,
     process::Command,
 };
 
@@ -25,6 +24,16 @@ pub struct OidcClient<T: OidcProvider> {
     synced: bool,
 }
 
+thread_local! {
+    static OIDC_CLIENTS: RefCell<HashMap<TypeId, Box<dyn SyncOidc>>> = Default::default();
+}
+
+trait SyncOidc: Any {
+    fn sync(&mut self) -> anyhow::Result<()>;
+
+    fn get_local_conf(&self) -> &'static RefCell<LocalConf>;
+}
+
 impl<T: OidcProvider> OidcClient<T> {
     fn new(conf: &'static Config) -> Self {
         let mut dummy_fw_proxy = ForwardProxy::from_config(conf, ());
@@ -40,43 +49,46 @@ impl<T: OidcProvider> OidcClient<T> {
             synced: false,
         }
     }
-}
 
-thread_local! {
-    static OIDC_CLIENTS: RefCell<HashMap<TypeId, Box<dyn Any>>> = Default::default();
-}
-
-impl<T: OidcProvider> OidcClient<T> {
-    pub fn add_public_redirect_path(conf: &'static Config, path: &str) -> PublicOidcClient<T> {
+    pub fn add_public_redirect_path(conf: &'static Config, path: &str) -> PublicOidcClient {
         OIDC_CLIENTS.with_borrow_mut(|m| {
-            m.entry(TypeId::of::<T>())
+            let syncer = m
+                .entry(TypeId::of::<T>())
                 .or_insert_with(|| Box::new(Self::new(conf)))
+                .as_mut() as &mut dyn Any;
+            syncer
                 .downcast_mut::<Self>()
                 .unwrap()
                 .pub_redirect_paths
                 .extend(redirect_urls_for_path(path, &conf.hostname));
         });
         PublicOidcClient {
-            provider: PhantomData,
+            provider: TypeId::of::<T>(),
             client_id: format!("{}-public", conf.site_id),
         }
     }
 
-    pub fn add_private_redirect_path(conf: &'static Config, path: &str) -> PrivateOidcClient<T> {
+    pub fn add_private_redirect_path(conf: &'static Config, path: &str) -> PrivateOidcClient {
         OIDC_CLIENTS.with_borrow_mut(|m| {
-            m.entry(TypeId::of::<T>())
+            let syncer = m
+                .entry(TypeId::of::<T>())
                 .or_insert_with(|| Box::new(Self::new(conf)))
+                .as_mut() as &mut dyn Any;
+            syncer
                 .downcast_mut::<Self>()
                 .unwrap()
                 .priv_redirect_urls
                 .extend(redirect_urls_for_path(path, &conf.hostname));
         });
         PrivateOidcClient {
-            provider: PhantomData,
+            provider: TypeId::of::<T>(),
             client_id: format!("{}-private", conf.site_id),
+            private_client_name: format!("{}_client_secret", T::BeamProvider::network_name()),
         }
     }
+}
 
+impl<T: OidcProvider> SyncOidc for OidcClient<T> {
     fn sync(&mut self) -> anyhow::Result<()> {
         if self.synced {
             return Ok(());
@@ -96,8 +108,8 @@ impl<T: OidcProvider> OidcClient<T> {
         if secret_sync_defs.is_empty() {
             bail!("No secrets to sync")
         }
-        let root_cert_file =
-            std::env::temp_dir().join(format!("{}.pem", T::BeamProvider::network_name()));
+        let temp_dir = std::env::temp_dir();
+        let root_cert_file = temp_dir.join(format!("{}.pem", T::BeamProvider::network_name()));
         fs::write(&root_cert_file, T::BeamProvider::root_cert())?;
         let mut beam_proxy_conf = Command::new("proxy");
         beam_proxy_conf
@@ -112,7 +124,6 @@ impl<T: OidcProvider> OidcClient<T> {
             beam_proxy_conf.env("ALL_PROXY", http_proxy.as_str());
         }
         let mut beam_proxy = beam_proxy_conf.spawn()?;
-        fs::create_dir_all("/usr/local")?;
         let cached_data = self
             .local_conf
             .borrow()
@@ -122,15 +133,17 @@ impl<T: OidcProvider> OidcClient<T> {
             .map(|(k, v)| format!("{k}=\"{v}\""))
             .collect::<Vec<_>>()
             .join("\n");
-        fs::write("/usr/local/cache", cached_data)?;
+        let cache_path = temp_dir.join("cache");
+        fs::write(&cache_path, cached_data)?;
         let mut secret_sync = Command::new("local")
             .env("PROXY_ID", &self.beam_proxy.proxy_id)
             .env("OIDC_PROVIDER", T::oidc_provider_id())
             .env("SECRET_DEFINITIONS", secret_sync_defs.join("\x1E"))
+            .env("CACHE_PATH", &cache_path)
             .spawn()?;
         secret_sync.wait()?;
         beam_proxy.kill()?;
-        let out = fs::read_to_string("/usr/local/cache")?;
+        let out = fs::read_to_string(cache_path)?;
         let new_cache = out
             .lines()
             .filter_map(|l| l.split_once('='))
@@ -147,33 +160,30 @@ impl<T: OidcProvider> OidcClient<T> {
         Ok(())
     }
 
-    fn evaluate() -> &'static RefCell<LocalConf> {
-        OIDC_CLIENTS.with_borrow_mut(|m| {
-            let client_spec = m
-                .get_mut(&TypeId::of::<T>())
-                .unwrap()
-                .downcast_mut::<Self>()
-                .unwrap();
-            if let Err(e) = client_spec.sync() {
-                eprintln!(
-                    "Failed to sync oidc client via {}: {e:#}",
-                    T::oidc_provider_id()
-                );
-            }
-            client_spec.local_conf
-        })
+    fn get_local_conf(&self) -> &'static RefCell<LocalConf> {
+        self.local_conf
     }
+}
+
+fn evaluate(provider: TypeId) -> &'static RefCell<LocalConf> {
+    OIDC_CLIENTS.with_borrow_mut(|m| {
+        let client_spec = m.get_mut(&provider).unwrap();
+        if let Err(e) = client_spec.sync() {
+            eprintln!("Failed to sync oidc client: {e:#}");
+        }
+        client_spec.get_local_conf()
+    })
 }
 
 fn redirect_urls_for_path(path: &str, host: &Host) -> Vec<String> {
     let mut out = Vec::new();
     match host {
         Host::Domain(domain) => {
-            out.push(dbg!(format!("https://{domain}{path}")));
             if let Some(without_proxy) = domain.split_once('.').map(|(root_domain, _)| root_domain)
             {
-                out.push(dbg!(format!("https://{without_proxy}{path}")));
+                out.push(format!("https://{without_proxy}{path}"));
             }
+            out.push(format!("https://{domain}{path}"));
         }
         Host::Ipv4(ipv4_addr) => out.push(dbg!(format!("https://{ipv4_addr}{path}"))),
         Host::Ipv6(ipv6_addr) => out.push(format!("https://[{ipv6_addr}]{path}")),
@@ -181,37 +191,37 @@ fn redirect_urls_for_path(path: &str, host: &Host) -> Vec<String> {
     out
 }
 
-pub struct PublicOidcClient<T: OidcProvider> {
-    provider: PhantomData<T>,
+pub struct PublicOidcClient {
+    provider: TypeId,
     client_id: String,
 }
 
-impl<T: OidcProvider> PublicOidcClient<T> {
+impl PublicOidcClient {
     pub fn client_id(&self) -> &str {
-        OidcClient::<T>::evaluate();
+        evaluate(self.provider);
         &self.client_id
     }
 }
 
-pub struct PrivateOidcClient<T: OidcProvider> {
-    provider: PhantomData<T>,
+pub struct PrivateOidcClient {
+    provider: TypeId,
     client_id: String,
+    private_client_name: String,
 }
 
-impl<T: OidcProvider> PrivateOidcClient<T> {
+impl PrivateOidcClient {
     pub fn client_id(&self) -> &str {
-        OidcClient::<T>::evaluate();
+        evaluate(self.provider);
         &self.client_id
     }
 
     pub fn client_secret(&self) -> String {
-        let private_client_name = format!("{}_client_secret", T::BeamProvider::network_name());
-        OidcClient::<T>::evaluate()
+        evaluate(self.provider)
             .borrow()
             .oidc
             .as_ref()
             .unwrap()
-            .get(&private_client_name)
+            .get(&self.private_client_name)
             .cloned()
             // HACK: If we have a config that requires oidc and we are not enrolled yet we don't want to panic
             // as that will prevent generation of the bridgehead script so lets default to an empty string.
