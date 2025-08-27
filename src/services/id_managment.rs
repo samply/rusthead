@@ -9,7 +9,8 @@ use url::Url;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct IdManagementConfig {
-    upload_apikey: String,
+    // Used by teiler for health checks
+    pub upload_apikey: String,
     read_apikey: String,
     central_patientlist_apikey: String,
     controlnumbergenerator_apikey: String,
