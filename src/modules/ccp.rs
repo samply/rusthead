@@ -4,7 +4,8 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::services::{
-    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, IdManagement, IdManagementConfig, OidcProvider, ServiceMap, Transfair, TransfairConfig
+    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, IdManagement,
+    IdManagementConfig, OidcProvider, ServiceMap, Teiler, TeilerConfig, Transfair, TransfairConfig,
 };
 
 use super::Module;
@@ -14,6 +15,8 @@ use super::Module;
 pub struct CcpConfig {
     pub id_manager: Option<IdManagementConfig>,
     pub transfair: Option<TransfairConfig>,
+    pub teiler: Option<TeilerConfig>,
+    pub datashield: Option<()>,
 }
 
 pub struct CcpDefault;
@@ -29,6 +32,9 @@ impl Module for CcpDefault {
         }
         if let Some(transfair_conf) = &ccp_conf.transfair {
             service_map.install_with_config::<Transfair<Self>>((transfair_conf, conf));
+        }
+        if let Some(teiler_conf) = &ccp_conf.teiler {
+            service_map.install_with_config::<Teiler<Self>>((teiler_conf, conf));
         }
     }
 }

@@ -10,6 +10,8 @@ use askama::Template;
 use crate::{Config, modules::Module};
 
 mod postgres;
+mod teiler;
+pub use teiler::*;
 mod transfair;
 pub use transfair::*;
 mod id_managment;
