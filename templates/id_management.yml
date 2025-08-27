@@ -60,9 +60,9 @@ services:
       - https_proxy={{ fw_proxy_url }}
       - OAUTH2_PROXY_PROVIDER=oidc
       - OAUTH2_PROXY_SKIP_PROVIDER_BUTTON=true
-      - OAUTH2_PROXY_OIDC_ISSUER_URL={{ oidc_url }}
-      - OAUTH2_PROXY_CLIENT_ID=bridgehead-{{ site_id }}
-      - OAUTH2_PROXY_CLIENT_SECRET={{ conf.auth_client_secret }}
+      - OAUTH2_PROXY_OIDC_ISSUER_URL={{ oidc.private_issuer_url() }}
+      - OAUTH2_PROXY_CLIENT_ID={{ oidc.client_id() }}
+      - OAUTH2_PROXY_CLIENT_SECRET={{ oidc.client_secret() }}
       - OAUTH2_PROXY_COOKIE_SECRET={{ conf.auth_cookie_secret }}
       - OAUTH2_PROXY_COOKIE_NAME=_BRIDGEHEAD_oauth2_idm
       - OAUTH2_PROXY_COOKIE_DOMAINS=.{{ hostname }}
@@ -75,9 +75,8 @@ services:
       # Pass Authorization Header and some user information to backend services
       - OAUTH2_PROXY_SET_AUTHORIZATION_HEADER=true
       - OAUTH2_PROXY_SET_XAUTHREQUEST=true
-      # Keycloak has an expiration time of 60s therefore oauth2-proxy needs to refresh after that
-      - OAUTH2_PROXY_COOKIE_REFRESH=60s
-      - OAUTH2_PROXY_ALLOWED_GROUPS=DKTK-CCP-PPSN
+      - OAUTH2_PROXY_ALLOWED_GROUPS={{ oidc_group }}
+      - OAUTH2_PROXY_OIDC_GROUPS_CLAIM=groups
       - OAUTH2_PROXY_PROXY_PREFIX=/oauth2-idm
     labels:
       - "traefik.enable=true"

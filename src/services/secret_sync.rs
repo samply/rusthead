@@ -208,6 +208,7 @@ impl PublicOidcClient {
     }
 }
 
+#[derive(Debug)]
 pub struct PrivateOidcClient {
     provider: TypeId,
     client_id: String,

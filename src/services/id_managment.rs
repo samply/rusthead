@@ -1,6 +1,11 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{config::Config, modules::CcpDefault, utils::capitalize_first_letter};
+use crate::{
+    config::Config,
+    modules::CcpDefault,
+    services::{OidcClient, PrivateOidcClient},
+    utils::capitalize_first_letter,
+};
 
 use super::{ForwardProxy, Service, ToCompose, Traefik, postgres::Postgres};
 use askama::Template;
@@ -14,7 +19,6 @@ pub struct IdManagementConfig {
     read_apikey: String,
     central_patientlist_apikey: String,
     controlnumbergenerator_apikey: String,
-    auth_client_secret: String,
     auth_cookie_secret: String,
     #[serde(default)]
     seeds: HashMap<String, (u32, u32, u32)>,
@@ -29,8 +33,8 @@ where
     project: PhantomData<Project>,
     id: String,
     hostname: String,
-    site_id: &'static str,
-    oidc_url: Url,
+    oidc: PrivateOidcClient,
+    oidc_group: String,
     conf: &'static IdManagementConfig,
     local_apikey: String,
     postgres_pw: String,
@@ -51,13 +55,14 @@ impl Service for IdManagement<CcpDefault> {
         Self {
             id: legacy_id_mapping(&conf.site_id),
             hostname: conf.hostname.to_string(),
-            site_id: &conf.site_id,
             conf: idm_conf,
             fw_proxy_url: fw_proxy.get_url(),
             fw_proxy_name: fw_proxy.service_name(),
-            oidc_url: "https://login.verbis.dkfz.de/realms/master"
-                .parse()
-                .unwrap(),
+            oidc: OidcClient::<CcpDefault>::add_private_redirect_path(conf, "/oauth2-idm/callback"),
+            oidc_group: format!(
+                "DKTK_CCP_{}_Verwalter",
+                capitalize_first_letter(&conf.site_id)
+            ),
             project: PhantomData,
             postgres_pw: pg.password.clone(),
             local_apikey: conf.local_conf.borrow().generate_secret::<10>(),
