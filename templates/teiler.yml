@@ -65,6 +65,6 @@ services:
       TEILER_DASHBOARD_DE_URL: "/{{ name }}-dashboard/de"
       TEILER_DASHBOARD_EN_URL: "/{{ name }}-dashboard/en"
       HTTP_PROXY: {{ forward_proxy_url }}
-      ENABLE_MTBA: {{ mtba_enabled }}"
-      ENABLE_DATASHIELD: {{ datashield_enabled }}"
-      IDMANAGER_UPLOAD_APIKEY: {{ idm_upload_apikey.as_deref().unwrap_or_default() }} # Used for health checks
+      ENABLE_MTBA: {{ mtba_enabled }}
+      ENABLE_DATASHIELD: {{ datashield_enabled }}
+      IDMANAGER_UPLOAD_APIKEY: "{{ idm_upload_apikey.as_deref().unwrap_or_default() }}" # Used for health checks
