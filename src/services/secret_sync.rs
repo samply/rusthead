@@ -16,7 +16,6 @@ use super::{BeamProxy, BrokerProvider, ForwardProxy, Service};
 #[derive(Debug)]
 pub struct OidcClient<T: OidcProvider> {
     beam_proxy: BeamProxy<T::BeamProvider>,
-    site_id: String,
     http_proxy_url: Option<Url>,
     pub_redirect_paths: Vec<String>,
     priv_redirect_urls: Vec<String>,
@@ -40,7 +39,6 @@ impl<T: OidcProvider> OidcClient<T> {
         let beam_proxy = BeamProxy::from_config(conf, (&mut dummy_fw_proxy,));
         let proxy_url = dummy_fw_proxy.https_proxy_url;
         Self {
-            site_id: conf.site_id.clone(),
             beam_proxy,
             pub_redirect_paths: Default::default(),
             priv_redirect_urls: Default::default(),
