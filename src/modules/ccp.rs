@@ -76,7 +76,17 @@ impl OidcProvider for CcpDefault {
         )
     }
 
-    fn issuer_url() -> Url {
-        Url::parse("https://login.verbis.dkfz.de/realms/test-realm-01").unwrap()
+    fn issuer_url(public_client_id: &str) -> Url {
+        Url::parse(&format!(
+            "https://sso.verbis.dkfz.de/application/o/{public_client_id}/"
+        ))
+        .unwrap()
+    }
+
+    fn private_issuer_url(private_client_id: &str) -> Url {
+        Url::parse(&format!(
+            "https://sso.verbis.dkfz.de/application/o/{private_client_id}/"
+        ))
+        .unwrap()
     }
 }

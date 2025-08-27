@@ -30,7 +30,7 @@ services:
       DEFAULT_LANGUAGE: "{{ conf.language }}"
       TEILER_BACKEND_URL: "/{{ name }}-backend"
       TEILER_DASHBOARD_URL: "/{{ name }}-dashboard"
-      OIDC_URL: "{{ oidc_url }}"
+      OIDC_URL: "{{ oidc_client.pub_issuer_url() }}"
       OIDC_CLIENT_ID: "{{ oidc_client.client_id() }}"
       OIDC_TOKEN_GROUP: "groups"
       TEILER_ADMIN_NAME: ""

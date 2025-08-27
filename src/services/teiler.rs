@@ -5,10 +5,7 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::{
-    config::Config,
-    modules::CcpDefault,
-    services::{ForwardProxy, OidcProvider},
-    utils::capitalize_first_letter,
+    config::Config, modules::CcpDefault, services::ForwardProxy, utils::capitalize_first_letter,
 };
 
 use super::{BrokerProvider, OidcClient, PublicOidcClient, Service};
@@ -38,7 +35,6 @@ where
     datashield_enabled: bool,
     idm_upload_apikey: Option<String>,
     forward_proxy_url: Url,
-    oidc_url: Url,
     oidc_user_group: String,
     oidc_admin_group: String,
 }
@@ -72,10 +68,9 @@ impl Service for Teiler<CcpDefault> {
                 .as_ref()
                 .and_then(|c| c.id_manager.as_ref())
                 .map(|idm| idm.upload_apikey.clone()),
-            oidc_url: CcpDefault::issuer_url(),
             oidc_user_group: format!("DKTK_CCP_{}", capitalize_first_letter(&global_conf.site_id)),
             oidc_admin_group: format!(
-                "DKTK_CCP_{}_VERWALTER",
+                "DKTK_CCP_{}_Verwalter",
                 capitalize_first_letter(&global_conf.site_id)
             ),
         }

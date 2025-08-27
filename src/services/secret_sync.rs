@@ -65,6 +65,7 @@ impl<T: OidcProvider> OidcClient<T> {
         PublicOidcClient {
             provider: TypeId::of::<T>(),
             client_id: format!("{}-public", conf.site_id),
+            get_issuer_url: T::issuer_url,
         }
     }
 
@@ -84,6 +85,7 @@ impl<T: OidcProvider> OidcClient<T> {
             provider: TypeId::of::<T>(),
             client_id: format!("{}-private", conf.site_id),
             private_client_name: format!("{}_client_secret", T::BeamProvider::network_name()),
+            get_issuer_url: T::private_issuer_url,
         }
     }
 }
@@ -185,7 +187,7 @@ fn redirect_urls_for_path(path: &str, host: &Host) -> Vec<String> {
             }
             out.push(format!("https://{domain}{path}"));
         }
-        Host::Ipv4(ipv4_addr) => out.push(dbg!(format!("https://{ipv4_addr}{path}"))),
+        Host::Ipv4(ipv4_addr) => out.push(format!("https://{ipv4_addr}{path}")),
         Host::Ipv6(ipv6_addr) => out.push(format!("https://[{ipv6_addr}]{path}")),
     }
     out
@@ -194,6 +196,7 @@ fn redirect_urls_for_path(path: &str, host: &Host) -> Vec<String> {
 pub struct PublicOidcClient {
     provider: TypeId,
     client_id: String,
+    get_issuer_url: fn(&str) -> Url,
 }
 
 impl PublicOidcClient {
@@ -201,12 +204,17 @@ impl PublicOidcClient {
         evaluate(self.provider);
         &self.client_id
     }
+
+    pub fn pub_issuer_url(&self) -> Url {
+        (self.get_issuer_url)(&self.client_id)
+    }
 }
 
 pub struct PrivateOidcClient {
     provider: TypeId,
     client_id: String,
     private_client_name: String,
+    get_issuer_url: fn(&str) -> Url,
 }
 
 impl PrivateOidcClient {
@@ -227,6 +235,10 @@ impl PrivateOidcClient {
             // as that will prevent generation of the bridgehead script so lets default to an empty string.
             .unwrap_or_default()
     }
+
+    pub fn private_issuer_url(&self) -> Url {
+        (self.get_issuer_url)(&self.client_id)
+    }
 }
 
 pub trait OidcProvider: 'static {
@@ -234,5 +246,7 @@ pub trait OidcProvider: 'static {
 
     fn oidc_provider_id() -> String;
 
-    fn issuer_url() -> Url;
+    fn issuer_url(_public_client_id: &str) -> Url;
+
+    fn private_issuer_url(_private_client_id: &str) -> Url;
 }
