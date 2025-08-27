@@ -1,6 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{config::Config, modules::CcpDefault};
+use crate::{config::Config, modules::CcpDefault, utils::capitalize_first_letter};
 
 use super::{ForwardProxy, Service, ToCompose, Traefik, postgres::Postgres};
 use askama::Template;
@@ -87,15 +87,4 @@ fn legacy_id_mapping(site_id: &str) -> String {
         .replace("Lmu", "LMU")
         .replace("Dktk Test", "Teststandort")
         .replace(" ", "")
-}
-
-fn capitalize_first_letter(s: &str) -> String {
-    let mut chars = s.chars();
-    chars
-        .next()
-        .map(char::to_uppercase)
-        .into_iter()
-        .flatten()
-        .chain(chars)
-        .collect()
 }
