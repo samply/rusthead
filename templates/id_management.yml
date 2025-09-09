@@ -36,6 +36,7 @@ services:
       - TOMCAT_REVERSEPROXY_FQDN={{ hostname }}
       - TOMCAT_REVERSEPROXY_SSL=true
       - ML_SITE={{ id }}
+      - ML_DB_HOST={{ Self::pg_name() }}
       - ML_DB_PASS={{ postgres_pw }}
       - ML_API_KEY={{ local_apikey }}
       - ML_UPLOAD_API_KEY={{ conf.upload_apikey }}

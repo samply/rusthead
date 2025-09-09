@@ -60,7 +60,7 @@ impl Service for IdManagement<CcpDefault> {
             fw_proxy_name: fw_proxy.service_name(),
             oidc: OidcClient::<CcpDefault>::add_private_redirect_path(conf, "/oauth2-idm/callback"),
             oidc_group: format!(
-                "DKTK_CCP_{}_Verwalter",
+                "DKTK_CCP_{}_PSP",
                 capitalize_first_letter(&conf.site_id)
             ),
             project: PhantomData,
