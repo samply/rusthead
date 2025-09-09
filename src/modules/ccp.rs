@@ -13,9 +13,9 @@ use super::Module;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CcpConfig {
-    pub id_manager: Option<IdManagementConfig>,
-    pub transfair: Option<TransfairConfig>,
-    pub teiler: Option<TeilerConfig>,
+    id_manager: Option<IdManagementConfig>,
+    transfair: Option<TransfairConfig>,
+    teiler: Option<TeilerConfig>,
     pub datashield: Option<()>,
 }
 

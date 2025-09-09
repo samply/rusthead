@@ -5,7 +5,10 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::{
-    config::Config, modules::CcpDefault, services::ForwardProxy, utils::capitalize_first_letter,
+    config::Config,
+    modules::CcpDefault,
+    services::{ForwardProxy, IdManagement},
+    utils::capitalize_first_letter,
 };
 
 use super::{BrokerProvider, OidcClient, PublicOidcClient, Service};
@@ -40,13 +43,13 @@ where
 }
 
 impl Service for Teiler<CcpDefault> {
-    type Dependencies = (ForwardProxy,);
+    type Dependencies = (ForwardProxy, Option<IdManagement<CcpDefault>>);
 
     type ServiceConfig = (&'static TeilerConfig, &'static Config);
 
     fn from_config(
         (conf, global_conf): Self::ServiceConfig,
-        (fw_proxy,): super::Deps<Self>,
+        (fw_proxy, idm): super::Deps<Self>,
     ) -> Self {
         Self {
             project_t: PhantomData,
@@ -63,11 +66,7 @@ impl Service for Teiler<CcpDefault> {
                 .ccp
                 .as_ref()
                 .is_some_and(|c| c.datashield.is_some()),
-            idm_upload_apikey: global_conf
-                .ccp
-                .as_ref()
-                .and_then(|c| c.id_manager.as_ref())
-                .map(|idm| idm.upload_apikey.clone()),
+            idm_upload_apikey: idm.map(|idm| idm.conf.upload_apikey.clone()),
             oidc_user_group: format!("DKTK_CCP_{}", capitalize_first_letter(&global_conf.site_id)),
             oidc_admin_group: format!(
                 "DKTK_CCP_{}_Verwalter",

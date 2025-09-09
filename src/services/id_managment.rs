@@ -35,7 +35,7 @@ where
     hostname: String,
     oidc: PrivateOidcClient,
     oidc_group: String,
-    conf: &'static IdManagementConfig,
+    pub conf: &'static IdManagementConfig,
     local_apikey: String,
     postgres_pw: String,
     fw_proxy_url: Url,
@@ -59,10 +59,7 @@ impl Service for IdManagement<CcpDefault> {
             fw_proxy_url: fw_proxy.get_url(),
             fw_proxy_name: fw_proxy.service_name(),
             oidc: OidcClient::<CcpDefault>::add_private_redirect_path(conf, "/oauth2-idm/callback"),
-            oidc_group: format!(
-                "DKTK_CCP_{}_PSP",
-                capitalize_first_letter(&conf.site_id)
-            ),
+            oidc_group: format!("DKTK_CCP_{}_PSP", capitalize_first_letter(&conf.site_id)),
             project: PhantomData,
             postgres_pw: pg.password.clone(),
             local_apikey: conf.local_conf.borrow().generate_secret::<10>(),
