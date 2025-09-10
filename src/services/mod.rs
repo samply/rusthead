@@ -49,6 +49,65 @@ pub trait ServiceTuple {
     fn get<'services>(services: &'services mut ServiceMap) -> Option<Self::DepRefs<'services>>;
 }
 
+macro_rules! service_tuple_option {
+    ($($opt_ts:ident),* : $($ts:ident),*) => {
+        #[allow(unused, non_snake_case)]
+        impl<$($ts: Service,)* $($opt_ts: Service,)*> ServiceTuple for ($($ts,)* $(Option<$opt_ts>,)*) {
+            type DepRefs<'t> = ($(&'t mut $ts,)* $(Option<&'t mut $opt_ts>,)*);
+
+            fn get<'services>(services: &'services mut ServiceMap) -> Option<Self::DepRefs<'services>> {
+                let [$($ts,)* $($opt_ts,)*] = services.map.get_disjoint_mut([
+                    $(&TypeId::of::<$ts>(),)*
+                    $(&TypeId::of::<$opt_ts>(),)*
+                ]);
+                Some((
+                    // Required services must be present
+                    $((($ts?.as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap()),)*
+                    // Optional services may be absent
+                    $($opt_ts.map(|s| (s.as_mut() as &mut dyn Any).downcast_mut::<$opt_ts>().unwrap()),)*
+                ))
+            }
+        }
+
+        #[allow(unused, non_snake_case)]
+        impl<$($ts: DefaultService,)* $($opt_ts: Service,)*> DefaultServiceTuple for ($($ts,)* $(Option<$opt_ts>,)*) {
+            fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services> {
+                // Ensure all required services are created
+                $(
+                    let service = $ts::from_default_config(services);
+                    services.insert(service);
+                )*
+                let [$($ts,)* $($opt_ts,)*] = services.map.get_disjoint_mut([
+                    $(&TypeId::of::<$ts>(),)*
+                    $(&TypeId::of::<$opt_ts>(),)*
+                ]);
+                (
+                    // All required services are guaranteed to be created at this point
+                    $((($ts.unwrap().as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap()),)*
+                    // Optional services may be absent
+                    $($opt_ts.map(|s| (s.as_mut() as &mut dyn Any).downcast_mut::<$opt_ts>().unwrap()),)*
+                )
+            }
+        }
+    };
+}
+
+macro_rules! option_helper {
+    ($opt_ts:ident $(,)? $($ts:ident),*) => {
+        service_tuple_option!($opt_ts : $($ts),*);
+        option_helper!([$opt_ts], $($ts),*);
+    };
+    ([$($opt_ts:ident),*], $new_opt_ts:ident, $($ts:ident),+) => {
+        service_tuple_option!($($opt_ts,)* $new_opt_ts : $($ts),*);
+        option_helper!([$($opt_ts,)* $new_opt_ts], $($ts),*);
+    };
+    ([$($opt_ts:ident),*], $new_opt_ts:ident) => {
+        service_tuple_option!($($opt_ts,)* $new_opt_ts :);
+    };
+    ([$($opt_ts:ident),*],) => {};
+    () => {};
+}
+
 macro_rules! service_tuple {
     ($($ts:ident),*) => {
         #[allow(unused, non_snake_case)]
@@ -59,8 +118,8 @@ macro_rules! service_tuple {
                 let [$($ts,)*] = services.map.get_disjoint_mut([
                     $(&TypeId::of::<$ts>(),)*
                 ]);
-                // All services are guaranteed to be created at this point
-                Some(($(($ts?.as_mut() as &mut dyn Any).downcast_mut::<$ts>()?,)*))
+                // Try to get all services, return None if any is missing
+                Some(($(($ts?.as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap(),)*))
             }
         }
 
@@ -79,6 +138,7 @@ macro_rules! service_tuple {
                 ($(($ts.unwrap().as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap(),)*)
             }
         }
+        option_helper!($($ts),*);
     };
 }
 
