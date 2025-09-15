@@ -27,8 +27,6 @@ pub struct Config {
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
-    #[serde(default = "default_srv_dir")]
-    pub srv_dir: PathBuf,
     #[serde(skip)]
     pub path: PathBuf,
 
@@ -45,10 +43,6 @@ pub enum Environment {
     Test,
 }
 
-fn default_srv_dir() -> PathBuf {
-    PathBuf::from("/srv/docker/bridgehead")
-}
-
 impl Config {
     pub fn load(path: &PathBuf) -> anyhow::Result<Self> {
         anyhow::ensure!(
@@ -57,11 +51,6 @@ impl Config {
         );
         let mut conf: Config = toml::from_str(&std::fs::read_to_string(path.join("config.toml"))?)?;
         conf.path = path.clone();
-        anyhow::ensure!(
-            conf.srv_dir.is_absolute(),
-            "srv_path must be absolute unlike {:?}",
-            conf.srv_dir
-        );
         let local_conf = fs::read_to_string(conf.local_conf_path())
             .ok()
             .and_then(|data| toml::from_str(&data).ok())

@@ -1,22 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
-# Default values
-DEFAULT_CONFIG_DIR="/etc/bridgehead"
-DEFAULT_SRV_DIR="/srv/docker/bridgehead"
+DEFAULT_CONFIG_DIR="."
 
 # Check if config.toml exists
 if [ ! -f "${DEFAULT_CONFIG_DIR}/config.toml" ]; then
     echo "Setting up configuration for bridgehead"
     
-    read -p "Config directory [$DEFAULT_CONFIG_DIR]: " config_dir
+    read -p "Installation directory [$DEFAULT_CONFIG_DIR]: " config_dir
     config_dir="${config_dir:-$DEFAULT_CONFIG_DIR}"
     config_dir="$(readlink -f $config_dir)"
 
-    read -p "Serve directory [$DEFAULT_SRV_DIR]: " srv_dir
-    srv_dir="${srv_dir:-$DEFAULT_SRV_DIR}"
-    srv_dir="$(readlink -f $srv_dir)"
-    
     read -p "Site ID: " site_id
 
     default_hostname=$(hostname -f)
@@ -29,8 +23,6 @@ if [ ! -f "${DEFAULT_CONFIG_DIR}/config.toml" ]; then
 site_id = "$site_id"
 
 hostname = "$hostname"
-
-srv_dir = "$srv_dir"
 EOF
 
     read -p "Proxy [${HTTPS_PROXY:-None}]: " proxy
@@ -41,14 +33,10 @@ EOF
 else
     config_dir=$DEFAULT_CONFIG_DIR
     echo "Using already provided configuration from ${config_dir}/config.toml"
-    srv_dir=$(cat "$DEFAULT_CONFIG_DIR/config.toml" | grep -v '#' | grep srv_dir | sed 's/.*=\s*"\(.*\)"/\1/')
-    srv_dir="${srv_dir:-$DEFAULT_SRV_DIR}"
-    echo "Installation directory: $srv_dir"
 fi
 
 docker run --rm \
-    -v $srv_dir:$srv_dir \
     -v $config_dir:$config_dir \
     -e BRIDGEHEAD_CONFIG_PATH=$config_dir \
     samply/rusthead update
-sudo $srv_dir/bridgehead install
+sudo $config_dir/bridgehead install

@@ -3,9 +3,8 @@ set -e
 set -o pipefail
 
 {%- let config_dir = conf.path|path %}
-{%- let pwd = conf.srv_dir|path %}
 {%- let priv_key_file = conf.path.join(format!("pki/{}.priv.pem", self.conf.site_id)) %}
-cd {{ pwd }}
+cd {{ config_dir }}
 
 COMPOSE_FILES="$(ls services | awk '{print " -f services/" $0}')"
 [ -e ./docker-compose.override.yml ] && COMPOSE_FILES+=" -f docker-compose.override.yml"
@@ -15,16 +14,16 @@ main() {
         install)
             [ "$(id -u)" -ne 0 ] && echo "Install command must be run as root." && exit 1
             useradd -M -g docker -N bridgehead &>/dev/null || echo "Using existing user bridgehead."
-            chown -R bridgehead:docker {{ config_dir }} {{ pwd }}
-            chmod -R g+sw {{ config_dir }} {{ pwd }}
+            chown -R bridgehead:docker {{ config_dir }}
+            chmod -R g+sw {{ config_dir }}
             install_systemd
             {%- if beam_networks.is_empty() %}
             echo "Installation complete."
-            echo "You may start the bridgehead service with 'systemctl start bridgehead' or './bridgehead compose up' now."
+            echo "You may start the bridgehead service with 'systemctl start bridgehead' or '{{ config_dir }}/bridgehead compose up' now."
             {%- else %}
             if [ -e {{ priv_key_file.display() }} ]; then
                 echo "Private key already exists. Skipping enrollment."
-                echo "If you want to re-enroll or changed the configuration and are now included in a new beam network run 'sudo ./bridgehead enroll'."
+                echo "If you want to re-enroll or changed the configuration and are now included in a new beam network run 'sudo {{ config_dir }}/bridgehead enroll'."
                 echo "Installation complete."
             else
                 enroll
@@ -38,7 +37,7 @@ main() {
         compose)
             {%- if !beam_networks.is_empty() %}
             if [ ! -f {{ priv_key_file.display() }} ]; then
-                echo "Beam private key not found. Please run 'sudo ./bridgehead enroll' first."
+                echo "Beam private key not found. Please run 'sudo {{ config_dir }}/bridgehead enroll' first."
                 exit 1
             fi
             {%- endif %}
@@ -52,13 +51,12 @@ main() {
             ;;
         {%- endif %}
         update)
-            docker pull samply/rusthead:latest &>/dev/null || echo "Failed to pull latest rusthead image. Using local image."
+            docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
             exec docker run --rm \
                 -v {{ config_dir }}:{{ config_dir }} \
-                -v {{ pwd }}:{{ pwd }} \
                 -e BRIDGEHEAD_CONFIG_PATH={{ config_dir }} \
                 -u "$(id -u bridgehead):$(id -g bridgehead)" \
-                samply/rusthead:latest update
+                samply/rusthead:${TAG:-latest} update
             ;;
         *)
             exit 1
@@ -95,7 +93,7 @@ Description=Bridgehead Service
 Requires=docker.service
 
 [Service]
-ExecStart={{ pwd }}/bridgehead compose up
+ExecStart={{ config_dir }}/bridgehead compose up
 Restart=always
 User=bridgehead
 Group=docker
@@ -109,7 +107,7 @@ Description=Bridgehead Update Service
 Requires=docker.service
 
 [Service]
-ExecStart={{ pwd }}/bridgehead update
+ExecStart={{ config_dir }}/bridgehead update
 User=bridgehead
 Group=docker
 EOF

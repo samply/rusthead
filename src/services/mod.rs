@@ -279,7 +279,7 @@ impl ServiceMap {
     }
 
     pub fn write_composables(&self) -> anyhow::Result<()> {
-        let services_dir = self.config.srv_dir.join("services");
+        let services_dir = self.config.path.join("services");
         _ = fs::remove_dir_all(&services_dir);
         fs::create_dir_all(&services_dir)?;
         for service in self.map.values() {

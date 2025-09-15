@@ -23,7 +23,7 @@ impl Bridgehead {
     }
 
     pub fn write(&self) -> anyhow::Result<()> {
-        let path = self.conf.srv_dir.join("bridgehead");
+        let path = self.conf.path.join("bridgehead");
         fs::write(&path, self.render()?)?;
         #[cfg(unix)]
         {
