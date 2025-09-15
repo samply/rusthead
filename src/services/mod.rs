@@ -283,7 +283,8 @@ impl ServiceMap {
         _ = fs::remove_dir_all(&services_dir);
         fs::create_dir_all(&services_dir)?;
         for service in self.map.values() {
-            eprintln!("Generating service {}", service.service_name());
+            let service_name = service.service_name();
+            eprintln!("Generating service {service_name}");
             fs::write(
                 services_dir.join(format!("{}.yml", service.service_name())),
                 service.render()?,

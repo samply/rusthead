@@ -39,11 +39,15 @@ pub struct BeamProxy<T: BrokerProvider> {
 impl<T: BrokerProvider> BeamProxy<T> {
     /// Returns (BeamAppId, BeamSecret)
     pub fn add_service(&mut self, service_name: &'static str) -> (String, String) {
-        let secret = self
-            .app_keys
-            .entry(service_name)
-            .or_insert_with(|| self.local_conf.borrow().generate_secret::<10>());
-        (format!("{service_name}.{}", self.proxy_id), secret.clone())
+        let secret_var = self.app_keys.entry(service_name).or_insert_with(|| {
+            self.local_conf
+                .borrow_mut()
+                .generate_secret::<10, Self>(format!("{service_name}_KEY").as_str())
+        });
+        (
+            format!("{service_name}.{}", self.proxy_id),
+            secret_var.clone(),
+        )
     }
 
     pub fn get_url(&self) -> Url {

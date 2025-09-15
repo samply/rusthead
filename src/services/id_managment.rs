@@ -62,7 +62,10 @@ impl Service for IdManagement<CcpDefault> {
             oidc_group: format!("DKTK_CCP_{}_PSP", capitalize_first_letter(&conf.site_id)),
             project: PhantomData,
             postgres_pw: pg.password.clone(),
-            local_apikey: conf.local_conf.borrow().generate_secret::<10>(),
+            local_apikey: conf
+                .local_conf
+                .borrow_mut()
+                .generate_secret::<10, Self>("apikey"),
         }
     }
 
