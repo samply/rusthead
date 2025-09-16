@@ -60,7 +60,10 @@ impl Service for Teiler<CcpDefault> {
             project: "ccp".to_string(),
             conf,
             forward_proxy_url: fw_proxy.get_url(),
-            exporter_api_key: global_conf.local_conf.borrow().generate_secret::<10>(),
+            exporter_api_key: global_conf
+                .local_conf
+                .borrow_mut()
+                .generate_secret::<10, Self>("exporter_api_key"),
             mtba_enabled: false,
             datashield_enabled: global_conf
                 .ccp

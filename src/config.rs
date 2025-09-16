@@ -13,7 +13,7 @@ use url::{Host, Url};
 
 use crate::{
     modules::{BbmriConfig, CcpConfig},
-    services::BasicAuthUser,
+    services::{BasicAuthUser, Service},
 };
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +75,10 @@ impl Config {
     pub fn write_local_conf(&self) -> anyhow::Result<()> {
         let conf_str = toml::to_string_pretty(self.local_conf.borrow().deref())?;
         fs::write(self.local_conf_path(), conf_str)?;
+        fs::write(
+            self.path.join(".env"),
+            self.local_conf.borrow().to_env()?.as_bytes(),
+        )?;
         Ok(())
     }
 }
@@ -83,9 +87,11 @@ impl Config {
 #[serde(deny_unknown_fields)]
 pub struct LocalConf {
     #[serde(default = "generate_seed")]
-    pub seed: u32,
+    seed: u32,
     pub oidc: Option<HashMap<String, String>>,
     pub basic_auth_users: Option<HashMap<String, BasicAuthUser>>,
+    #[serde(skip)]
+    pub generated_secrets: HashMap<String, String>,
 }
 
 fn generate_seed() -> u32 {
@@ -98,25 +104,45 @@ impl Default for LocalConf {
             seed: generate_seed(),
             oidc: None,
             basic_auth_users: None,
+            generated_secrets: Default::default(),
         }
     }
 }
 
 impl LocalConf {
-    pub fn generate_secret<const N: usize>(&self) -> String {
+    #[must_use]
+    pub fn generate_secret<const N: usize, T: Service>(&mut self, name: &str) -> String {
         static RNG: OnceLock<Mutex<StdRng>> = OnceLock::new();
         let mut rng = RNG
             .get_or_init(|| StdRng::seed_from_u64(self.seed as u64).into())
             .lock()
             .unwrap();
-        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-                                abcdefghijklmnopqrstuvwxyz\
-                                0123456789)(*&^%#@!~";
-        (0..N)
-            .map(|_| {
-                let idx = rng.random_range(0..CHARSET.len());
-                CHARSET[idx] as char
-            })
-            .collect()
+        let secret = crate::utils::secret_from_rng::<N>(&mut rng);
+        let name = format!(
+            "{}_{}",
+            <T as Service>::service_name()
+                .to_uppercase()
+                .replace("-", "_"),
+            name.to_uppercase()
+        );
+        let var = format!("${{{name}}}");
+        self.generated_secrets.insert(name, secret);
+        var
+    }
+
+    pub fn to_env(&self) -> anyhow::Result<String> {
+        use std::fmt::Write;
+        let mut env = String::from(
+            "# This file is auto generated please modify config.toml or config.local.toml instead!\n\n",
+        );
+        if let Some(ref oidc) = self.oidc {
+            for (k, v) in oidc {
+                writeln!(&mut env, "OIDC_{}=\"{}\"", k.to_uppercase(), v)?;
+            }
+        }
+        for (k, v) in &self.generated_secrets {
+            writeln!(&mut env, "{}=\"{}\"", k, v)?;
+        }
+        Ok(env)
     }
 }

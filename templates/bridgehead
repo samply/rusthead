@@ -42,7 +42,7 @@ main() {
             fi
             {%- endif %}
             shift
-            exec docker compose -p bridgehead $COMPOSE_FILES $@
+            exec docker compose -p bridgehead --env-file .env $COMPOSE_FILES $@
             ;;
         {%- if !beam_networks.is_empty() %}
         enroll)

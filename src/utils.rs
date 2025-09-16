@@ -14,6 +14,15 @@ pub fn capitalize_first_letter(s: &str) -> String {
         .collect()
 }
 
+pub fn secret_from_rng<const N: usize>(rng: &mut impl rand::Rng) -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                            abcdefghijklmnopqrstuvwxyz\
+                            0123456789)(*&^%#@!~";
+    (0..N)
+        .map(|_| CHARSET[rng.random_range(0..CHARSET.len())] as char)
+        .collect()
+}
+
 pub mod filters {
     use std::path::PathBuf;
 

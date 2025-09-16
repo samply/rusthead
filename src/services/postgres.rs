@@ -25,7 +25,10 @@ impl<T: Service> Service for Postgres<T> {
             r#for: PhantomData,
             user: <T as Service>::service_name(),
             db: <T as Service>::service_name(),
-            password: conf.local_conf.borrow().generate_secret::<10>(),
+            password: conf
+                .local_conf
+                .borrow_mut()
+                .generate_secret::<10, Self>("db_password"),
         }
     }
 

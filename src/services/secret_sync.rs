@@ -222,17 +222,9 @@ impl PrivateOidcClient {
         &self.client_id
     }
 
-    pub fn client_secret(&self) -> String {
-        evaluate(self.provider)
-            .borrow()
-            .oidc
-            .as_ref()
-            .unwrap()
-            .get(&self.private_client_name)
-            .cloned()
-            // HACK: If we have a config that requires oidc and we are not enrolled yet we don't want to panic
-            // as that will prevent generation of the bridgehead script so lets default to an empty string.
-            .unwrap_or_default()
+    pub fn client_secret_var(&self) -> String {
+        evaluate(self.provider);
+        format!("${{OIDC_{}}}", self.private_client_name.to_uppercase())
     }
 
     pub fn private_issuer_url(&self) -> Url {
