@@ -221,6 +221,11 @@ impl ServiceMap {
         }
     }
 
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
     pub fn get_mut<T: Any>(&mut self) -> Option<&mut T> {
         self.map
             .get_mut(&TypeId::of::<T>())

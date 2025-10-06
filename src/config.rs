@@ -149,7 +149,13 @@ impl LocalConf {
 
 #[cfg(test)]
 mod tests {
-    use crate::{bridgehead::Bridgehead, modules, services::ServiceMap};
+    use std::process::{Command, Stdio};
+
+    use crate::{
+        bridgehead::Bridgehead,
+        modules,
+        services::{BEAM_NETWORKS, ServiceMap},
+    };
 
     use super::*;
 
@@ -169,6 +175,8 @@ mod tests {
                 .iter()
                 .for_each(|&m| services.install_module(m));
             services.write_composables().unwrap();
+            let has_beam_networks = BEAM_NETWORKS.with_borrow(|nets| !nets.is_empty());
+            let has_services = services.len() > 0;
             Bridgehead::new(&conf).write().unwrap();
             conf.write_local_conf().unwrap();
             let tmp_dir_path = temp_dir.path().display().to_string();
@@ -194,6 +202,38 @@ mod tests {
                     });
                 };
             });
+            if !has_services {
+                return;
+            }
+            if has_beam_networks {
+                // Fake enroll
+                let priv_key = rcgen::generate_simple_self_signed(vec![conf.site_id.clone()])
+                    .unwrap()
+                    .signing_key
+                    .serialize_pem();
+                fs::write(
+                    temp_dir
+                        .path()
+                        .join("pki")
+                        .join(format!("{}.priv.pem", conf.site_id)),
+                    priv_key,
+                )
+                .unwrap();
+            }
+            let out = Command::new("./bridgehead")
+                .current_dir(temp_dir.path())
+                .stdout(Stdio::null())
+                .arg("compose")
+                .arg("config")
+                .spawn()
+                .unwrap()
+                .wait_with_output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "Generated invalid compose files: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
         });
     }
 }
