@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::BTreeSet,
     fs::{self, Permissions},
 };
 
@@ -10,7 +10,7 @@ use crate::{config::Config, services::BEAM_NETWORKS, utils::filters};
 #[derive(Debug, Template)]
 #[template(path = "bridgehead")]
 pub struct Bridgehead {
-    beam_networks: HashSet<String>,
+    beam_networks: BTreeSet<String>,
     conf: &'static Config,
 }
 

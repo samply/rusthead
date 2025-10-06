@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     fs,
     marker::PhantomData,
     path::PathBuf,
@@ -79,5 +79,5 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
 }
 
 thread_local! {
-    pub static BEAM_NETWORKS: RefCell<HashSet<String>> = RefCell::default();
+    pub static BEAM_NETWORKS: RefCell<BTreeSet<String>> = RefCell::default();
 }
