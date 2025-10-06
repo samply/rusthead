@@ -26,8 +26,15 @@ impl Traefik {
             .get_or_insert_default()
             .entry(middleware_name)
             .or_insert_with(|| {
-                let hash = bcrypt::hash(&pw, DEFAULT_COST).unwrap();
-                BasicAuthUser { hash, pw: Some(pw) }
+                if cfg!(test) {
+                    BasicAuthUser {
+                        hash: "<hash>".into(),
+                        pw: Some("test".into()),
+                    }
+                } else {
+                    let hash = bcrypt::hash(&pw, DEFAULT_COST).unwrap();
+                    BasicAuthUser { hash, pw: Some(pw) }
+                }
             });
     }
 }

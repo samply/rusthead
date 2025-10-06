@@ -1,0 +1,124 @@
+---
+source: src/config.rs
+expression: file
+info:
+  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
+  - bridgehead
+input_file: tests/configs/example.config.toml
+---
+#!/usr/bin/env bash
+set -e
+set -o pipefail
+cd [TMP_DIR]
+
+COMPOSE_FILES="$(ls services | awk '{print " -f services/" $0}')"
+[ -e ./docker-compose.override.yml ] && COMPOSE_FILES+=" -f docker-compose.override.yml"
+
+main() {
+    case "$1" in
+        install)
+            [ "$(id -u)" -ne 0 ] && echo "Install command must be run as root." && exit 1
+            useradd -M -g docker -N bridgehead &>/dev/null || echo "Using existing user bridgehead."
+            chown -R bridgehead:docker [TMP_DIR]
+            chmod -R g+sw [TMP_DIR]
+            install_systemd
+            if [ -e [TMP_DIR]/pki/dummy.priv.pem ]; then
+                echo "Private key already exists. Skipping enrollment."
+                echo "If you want to re-enroll or changed the configuration and are now included in a new beam network run 'sudo [TMP_DIR]/bridgehead enroll'."
+                echo "Installation complete."
+            else
+                enroll
+            fi
+            ;;
+        logs)
+            shift
+            exec journalctl -u bridgehead -u bridgehead-update -a $@
+            ;;
+        compose)
+            if [ ! -f [TMP_DIR]/pki/dummy.priv.pem ]; then
+                echo "Beam private key not found. Please run 'sudo [TMP_DIR]/bridgehead enroll' first."
+                exit 1
+            fi
+            shift
+            exec docker compose -p bridgehead --env-file .env $COMPOSE_FILES $@
+            ;;
+        enroll)
+            [ "$(id -u)" -ne 0 ] && echo "Enroll must be run as root." && exit 1
+            enroll
+            ;;
+        update)
+            docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
+            exec docker run --rm \
+                -v [TMP_DIR]:[TMP_DIR] \
+                -e BRIDGEHEAD_CONFIG_PATH=[TMP_DIR] \
+                -u "$(id -u bridgehead):$(id -g bridgehead)" \
+                samply/rusthead:${TAG:-latest} update
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+}
+enroll() {
+    do_enroll() {
+        echo "Enrolling dummy.$1"
+        docker run --rm \
+            -v [TMP_DIR]/pki:[TMP_DIR]/pki \
+            docker.verbis.dkfz.de/cache/samply/beam-enroll:latest \
+            --output-file [TMP_DIR]/pki/dummy.priv.pem \
+            --proxy-id dummy.$1
+        chmod 600 [TMP_DIR]/pki/dummy.priv.pem
+    }
+    do_enroll broker.bbmri.samply.dedo_enroll broker.ccp-it.dktk.dkfz.de
+    echo "After getting the csrs enrolled you may start the bridgehead service with 'systemctl start bridgehead'."
+}
+
+install_systemd() {
+    if ! systemctl list-units &> /dev/null; then
+        echo "Systemd is not active. Skipping systemd setup."
+        return
+    fi
+    cat <<EOF > /etc/systemd/system/bridgehead.service
+[Unit]
+Description=Bridgehead Service
+Requires=docker.service
+
+[Service]
+ExecStart=[TMP_DIR]/bridgehead compose up
+Restart=always
+User=bridgehead
+Group=docker
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    cat <<EOF > /etc/systemd/system/bridgehead-update.service
+[Unit]
+Description=Bridgehead Update Service
+Requires=docker.service
+
+[Service]
+ExecStart=[TMP_DIR]/bridgehead update
+User=bridgehead
+Group=docker
+EOF
+    cat <<EOF > /etc/systemd/system/bridgehead-update.timer
+[Unit]
+Description=Daily Updates at 6am of Bridgehead
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+
+[Install]
+WantedBy=basic.target
+EOF
+    systemctl daemon-reload
+    systemctl start bridgehead-update.service
+    echo "Enabling autostart of bridgehead.service"
+    systemctl enable bridgehead.service
+    echo "Enabling auto-updates for bridgehead.service ..."
+    systemctl enable --now bridgehead-update.timer
+}
+
+main "$@"

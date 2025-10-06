@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::BTreeMap,
     fs,
     ops::Deref,
     path::PathBuf,
@@ -88,10 +88,10 @@ impl Config {
 pub struct LocalConf {
     #[serde(default = "generate_seed")]
     seed: u32,
-    pub oidc: Option<HashMap<String, String>>,
-    pub basic_auth_users: Option<HashMap<String, BasicAuthUser>>,
+    pub oidc: Option<BTreeMap<String, String>>,
+    pub basic_auth_users: Option<BTreeMap<String, BasicAuthUser>>,
     #[serde(skip)]
-    pub generated_secrets: HashMap<String, String>,
+    pub generated_secrets: BTreeMap<String, String>,
 }
 
 fn generate_seed() -> u32 {
@@ -144,5 +144,56 @@ impl LocalConf {
             writeln!(&mut env, "{}=\"{}\"", k, v)?;
         }
         Ok(env)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{bridgehead::Bridgehead, modules, services::ServiceMap};
+
+    use super::*;
+
+    #[test]
+    fn test_configs() {
+        let mut s = insta::Settings::clone_current();
+        s.set_prepend_module_to_snapshot(false);
+        let _guard = s.bind_to_scope();
+        insta::glob!("../tests/configs", "*.toml", |conf_path| {
+            let temp_dir = tempfile::tempdir().unwrap();
+            fs::copy(conf_path, temp_dir.path().join("config.toml")).unwrap();
+            let conf = Config::load(&temp_dir.path().to_path_buf()).unwrap();
+            conf.local_conf.borrow_mut().seed = 42;
+            let conf: &'static _ = Box::leak(Box::new(conf));
+            let mut services = ServiceMap::new(conf);
+            modules::MODULES
+                .iter()
+                .for_each(|&m| services.install_module(m));
+            services.write_composables().unwrap();
+            Bridgehead::new(&conf).write().unwrap();
+            conf.write_local_conf().unwrap();
+            let tmp_dir_path = temp_dir.path().display().to_string();
+            let filters = [(tmp_dir_path.as_str(), "[TMP_DIR]")];
+            insta::glob!(temp_dir.path(), "**/*", |path| {
+                if path.is_dir() || path.extension() == Some("pem".as_ref()) {
+                    return;
+                }
+                let file = std::fs::read_to_string(path).unwrap();
+                insta::allow_duplicates! {
+                    insta::with_settings!({
+                        filters => filters,
+                        input_file => &conf_path,
+                        snapshot_path => format!("../tests/snapshots/{}", conf_path.file_stem().unwrap().display()),
+                        info => &(conf_path.to_string_lossy(), path.file_name().unwrap().to_string_lossy()),
+                    }, {
+                        match path.file_name().and_then(|s| s.to_str()?.rsplit_once('.')) {
+                            Some((_, "yml")) => insta::assert_snapshot!(file),
+                            Some(("config", "toml")) => return,
+                            Some(("config.local", "toml")) => insta::assert_toml_snapshot!(toml::from_str::<toml::Table>(&file).unwrap()),
+                            _ => insta::assert_snapshot!(file),
+                        }
+                    });
+                };
+            });
+        });
     }
 }

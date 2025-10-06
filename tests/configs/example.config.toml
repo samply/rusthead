@@ -1,0 +1,6 @@
+site_id = "dummy"
+hostname = "dummy.local"
+
+[ccp]
+
+[bbmri]

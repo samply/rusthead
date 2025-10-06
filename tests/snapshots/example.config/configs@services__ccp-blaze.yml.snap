@@ -1,0 +1,26 @@
+---
+source: src/config.rs
+expression: file
+info:
+  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
+  - ccp-blaze.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  ccp-blaze:
+    image: docker.verbis.dkfz.de/cache/samply/blaze:latest
+    environment:
+      BASE_URL: http://ccp-blaze:8080
+      ENFORCE_REFERENTIAL_INTEGRITY: "false"
+    volumes:
+      - "ccp-blaze-data:/app/data"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ccp-blaze.rule=PathPrefix(`/ccp-localdatamanagement`)"
+      - "traefik.http.middlewares.ccp-blaze_strip.stripprefix.prefixes=/ccp-localdatamanagement"
+      - "traefik.http.services.ccp-blaze.loadbalancer.server.port=8080"
+      - "traefik.http.routers.ccp-blaze.middlewares=ccp-blaze_strip,ccp-blaze"
+      - "traefik.http.routers.ccp-blaze.tls=true"
+  
+volumes:
+  ccp-blaze-data:

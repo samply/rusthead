@@ -1,0 +1,19 @@
+---
+source: src/config.rs
+expression: file
+info:
+  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
+  - ccp-focus.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  ccp-focus:
+    image: docker.verbis.dkfz.de/cache/samply/focus:main-dktk
+    environment:
+      BEAM_APP_ID_LONG: focus.dummy.broker.ccp-it.dktk.dkfz.de
+      BEAM_PROXY_URL: http://ccp-beam-proxy:8081/
+      BLAZE_URL: http://ccp-blaze:8080/fhir/
+      API_KEY: "${CCP_BEAM_PROXY_FOCUS_KEY}"
+      RETRY_COUNT: 128
+      EPSILON: 0.28
+      ENDPOINT_TYPE: blaze

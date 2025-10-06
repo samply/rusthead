@@ -1,0 +1,9 @@
+---
+source: src/config.rs
+expression: "toml::from_str::<toml::Table>(&file).unwrap()"
+info:
+  - /mnt/cache/git/rusthead/tests/configs/minimal.toml
+  - config.local.toml
+input_file: tests/configs/minimal.toml
+---
+seed = 42

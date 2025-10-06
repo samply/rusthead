@@ -1,0 +1,26 @@
+---
+source: src/config.rs
+expression: file
+info:
+  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
+  - bbmri-blaze.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  bbmri-blaze:
+    image: docker.verbis.dkfz.de/cache/samply/blaze:latest
+    environment:
+      BASE_URL: http://bbmri-blaze:8080
+      ENFORCE_REFERENTIAL_INTEGRITY: "false"
+    volumes:
+      - "bbmri-blaze-data:/app/data"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bbmri-blaze.rule=PathPrefix(`/bbmri-localdatamanagement`)"
+      - "traefik.http.middlewares.bbmri-blaze_strip.stripprefix.prefixes=/bbmri-localdatamanagement"
+      - "traefik.http.services.bbmri-blaze.loadbalancer.server.port=8080"
+      - "traefik.http.routers.bbmri-blaze.middlewares=bbmri-blaze_strip,bbmri-blaze"
+      - "traefik.http.routers.bbmri-blaze.tls=true"
+  
+volumes:
+  bbmri-blaze-data:

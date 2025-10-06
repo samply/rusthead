@@ -1,0 +1,44 @@
+---
+source: src/config.rs
+expression: file
+info:
+  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
+  - traefik.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  traefik:
+    image: docker.verbis.dkfz.de/cache/traefik:latest
+    command:
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/configuration/
+      - --api.dashboard=false
+      - --accesslog=true
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.bbmri-blaze.basicauth.users=bbmri-blaze:<hash>"
+      - "traefik.http.middlewares.ccp-blaze.basicauth.users=ccp-blaze:<hash>"
+    ports:
+      - 80:80
+      - 443:443
+    configs:
+      - source: certificates.yaml
+        target: /configuration/certificates.yaml
+    volumes:
+      - [TMP_DIR]/traefik-tls:/certs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+configs:
+  certificates.yaml:
+    content: |
+      tls:
+        stores:
+          default:
+            defaultCertificate:
+              certFile: /certs/fullchain.pem
+              keyFile: /certs/privkey.pem
