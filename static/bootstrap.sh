@@ -31,7 +31,7 @@ EOF
     
     echo "Configuration file created at ${config_dir}/config.toml"
 else
-    config_dir=$DEFAULT_CONFIG_DIR
+    config_dir="$(readlink -f $DEFAULT_CONFIG_DIR)"
     echo "Using already provided configuration from ${config_dir}/config.toml"
 fi
 

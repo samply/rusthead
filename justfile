@@ -28,4 +28,5 @@ build:
   docker build -t samply/rusthead:$TAG .
 
 bootstrap: build
-  bash <(docker run --rm samply/rusthead:$TAG bootstrap)
+  mkdir -p bridgehead
+  cd bridgehead && bash <(docker run --rm samply/rusthead:$TAG bootstrap)
