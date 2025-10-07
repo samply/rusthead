@@ -1,12 +1,11 @@
-set unstable
 set shell := ["bash", "-cue"]
 
 ARCH := `docker version --format '{{.Server.Arch}}'`
 CONFIG_PATH := canonicalize(env("BRIDGEHEAD_CONFIG_PATH", "./bridgehead"))
 export TAG := env("TAG", "localbuild")
 
-run: build
-  docker run --rm -u "$(id -u bridgehead):$(id -g bridgehead)" -v {{ CONFIG_PATH }}:{{ CONFIG_PATH }} -e BRIDGEHEAD_CONFIG_PATH={{ CONFIG_PATH }} samply/rusthead:$TAG update
+run: build ensure_bootstrap
+  {{ CONFIG_PATH }}/bridgehead update
 
 up: down_bg run
   {{ CONFIG_PATH }}/bridgehead compose up
@@ -15,10 +14,14 @@ up: down_bg run
 down_bg:
   {{ CONFIG_PATH }}/bridgehead compose down &
 
+[private]
+ensure_bootstrap:
+  if ! {{ path_exists(CONFIG_PATH / "bridgehead") }}; then TAG=$TAG just bootstrap; fi
+
 down:
   {{ CONFIG_PATH }}/bridgehead compose down
 
-bridgehead *args: run
+bridgehead *args: build ensure_bootstrap
   {{ CONFIG_PATH }}/bridgehead {{ args }}
 
 build:
@@ -28,5 +31,5 @@ build:
   docker build -t samply/rusthead:$TAG .
 
 bootstrap: build
-  mkdir -p bridgehead
-  cd bridgehead && bash <(docker run --rm samply/rusthead:$TAG bootstrap)
+  mkdir -p {{ CONFIG_PATH }}
+  cd {{ CONFIG_PATH }} && bash <(docker run --rm samply/rusthead:$TAG bootstrap)

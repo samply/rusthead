@@ -21,7 +21,13 @@ main() {
             useradd -M -g docker -N bridgehead &>/dev/null || echo "Using existing user bridgehead."
             chown -R bridgehead:docker [TMP_DIR]
             chmod -R g+sw [TMP_DIR]
-            install_systemd
+            if ! systemctl list-units &> /dev/null; then
+                echo "Systemd is not active. Skipping systemd setup."
+                update
+                return
+            else
+                install_systemd
+            fi
             if [ -e [TMP_DIR]/pki/dummy.priv.pem ]; then
                 echo "Private key already exists. Skipping enrollment."
                 echo "If you want to re-enroll or changed the configuration and are now included in a new beam network run 'sudo [TMP_DIR]/bridgehead enroll'."
@@ -40,24 +46,50 @@ main() {
                 exit 1
             fi
             shift
-            exec docker compose -p bridgehead --env-file .env $COMPOSE_FILES $@
+            exec docker compose -p bridgehead --env-file .env $COMPOSE_FILES -f docker-image.lock.yml $@
             ;;
         enroll)
             [ "$(id -u)" -ne 0 ] && echo "Enroll must be run as root." && exit 1
             enroll
             ;;
         update)
-            docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
-            exec docker run --rm \
-                -v [TMP_DIR]:[TMP_DIR] \
-                -e BRIDGEHEAD_CONFIG_PATH=[TMP_DIR] \
-                -u "$(id -u bridgehead):$(id -g bridgehead)" \
-                samply/rusthead:${TAG:-latest} update
+            update
             ;;
         *)
+            echo "Unknown bridgehead command '$@'"
             exit 1
             ;;
     esac
+}
+
+update() {
+    env_hash=$(sha1sum .env | awk '{print $1}')
+    services_hash=$(sha1sum services/* | awk '{print $1}')
+    image_hashes=$(sha1sum docker-image.lock.yml | awk '{print $1}')
+    docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
+    docker run --rm \
+        -v [TMP_DIR]:[TMP_DIR] \
+        -e BRIDGEHEAD_CONFIG_PATH=[TMP_DIR] \
+        -u "$(id -u bridgehead):$(id -g bridgehead)" \
+        samply/rusthead:${TAG:-latest} update
+    docker image prune -f
+    # TODO: Check if we have any services
+    new_compose_files="$(ls services | awk '{print " -f services/" $0}')"
+    [ -e ./docker-compose.override.yml ] && new_compose_files+=" -f docker-compose.override.yml"
+    docker compose --env-file .env $new_compose_files pull
+    docker compose --env-file .env $new_compose_files config --lock-image-digests > docker-image.lock.yml
+    env_changed=$([ "$env_hash" != "$(sha1sum .env | awk '{print $1}')" ] && echo true || echo false)
+    services_changed=$([ "$services_hash" != "$(sha1sum services/* | awk '{print $1}')" ] && echo true || echo false)
+    images_changed=$([ "$image_hashes" != "$(sha1sum docker-image.lock.yml | awk '{print $1}')" ] && echo true || echo false)
+
+    if [ "$env_changed" = true ] || [ "$services_changed" = true ] || [ "$images_changed" = true ]; then
+        echo "Update completed. Changes detected in:"
+        [ "$env_changed" = true ] && echo "  - Environment configuration"
+        [ "$services_changed" = true ] && echo "  - Services configuration"
+        [ "$images_changed" = true ] && echo "  - Docker images" || true
+    else
+        echo "Update completed. No changes detected - everything is up to date."
+    fi
 }
 enroll() {
     do_enroll() {
@@ -74,10 +106,6 @@ enroll() {
 }
 
 install_systemd() {
-    if ! systemctl list-units &> /dev/null; then
-        echo "Systemd is not active. Skipping systemd setup."
-        return
-    fi
     cat <<EOF > /etc/systemd/system/bridgehead.service
 [Unit]
 Description=Bridgehead Service

@@ -6,7 +6,7 @@ DEFAULT_CONFIG_DIR="."
 # Check if config.toml exists
 if [ ! -f "${DEFAULT_CONFIG_DIR}/config.toml" ]; then
     echo "Setting up configuration for bridgehead"
-    
+
     read -p "Installation directory [$DEFAULT_CONFIG_DIR]: " config_dir
     config_dir="${config_dir:-$DEFAULT_CONFIG_DIR}"
     config_dir="$(readlink -f $config_dir)"
@@ -28,7 +28,7 @@ EOF
     read -p "Proxy [${HTTPS_PROXY:-None}]: " proxy
     proxy="${proxy:-$HTTPS_PROXY}"
     [ -n "$proxy" ] && echo "proxy = \"$proxy\"" >> "${config_dir}/config.toml"
-    
+
     echo "Configuration file created at ${config_dir}/config.toml"
 else
     config_dir="$(readlink -f $DEFAULT_CONFIG_DIR)"
@@ -38,5 +38,5 @@ fi
 docker run --rm \
     -v $config_dir:$config_dir \
     -e BRIDGEHEAD_CONFIG_PATH=$config_dir \
-    samply/rusthead update
+    samply/rusthead:${TAG:-latest} update
 sudo $config_dir/bridgehead install
