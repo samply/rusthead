@@ -1,4 +1,4 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::BTreeMap, marker::PhantomData};
 
 use crate::{
     config::Config,
@@ -21,7 +21,7 @@ pub struct IdManagementConfig {
     controlnumbergenerator_apikey: String,
     auth_cookie_secret: String,
     #[serde(default)]
-    seeds: HashMap<String, (u32, u32, u32)>,
+    seeds: BTreeMap<String, (u32, u32, u32)>,
 }
 
 #[derive(Debug, Template)]

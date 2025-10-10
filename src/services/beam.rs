@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeSet, BTreeMap},
     fs,
     marker::PhantomData,
     path::PathBuf,
@@ -31,7 +31,7 @@ pub struct BeamProxy<T: BrokerProvider> {
     pub proxy_id: String,
     pub priv_key: PathBuf,
     pub trusted_ca_certs: PathBuf,
-    app_keys: HashMap<&'static str, String>,
+    app_keys: BTreeMap<&'static str, String>,
     fw_proxy_url: Url,
     local_conf: &'static RefCell<LocalConf>,
 }
