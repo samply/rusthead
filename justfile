@@ -25,9 +25,9 @@ bridgehead *args: build ensure_bootstrap
   {{ CONFIG_PATH }}/bridgehead {{ args }}
 
 build:
-  cargo build --release
+  cargo build
   mkdir -p artifacts/binaries-{{ ARCH }}/
-  cp target/release/rusthead artifacts/binaries-{{ ARCH }}/rusthead
+  cp target/debug/rusthead artifacts/binaries-{{ ARCH }}/rusthead
   docker build -t samply/rusthead:$TAG .
 
 bootstrap: build

@@ -105,6 +105,16 @@ impl<T: OidcProvider> SyncOidc for OidcClient<T> {
             let priv_urls = self.priv_redirect_urls.join(",");
             secret_sync_defs.push(format!("OIDC:{private_client_name}:private;{priv_urls}"));
         }
+        #[cfg(debug_assertions)]
+        {
+            if let Some(cached) = self.local_conf.borrow().oidc.as_ref()
+                && [&public_client_name, &private_client_name]
+                    .iter()
+                    .all(|&name| cached.contains_key(name))
+            {
+                return Ok(());
+            }
+        }
         if secret_sync_defs.is_empty() {
             bail!("No secrets to sync")
         }

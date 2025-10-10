@@ -22,3 +22,6 @@ rcgen = "0.14.5"
 insta = { version = "1.43", features = ["filters", "glob", "toml"] }
 tempfile = "3.23"
 toml = { version = "*", features = ["preserve_order"] }
+
+[profile.dev]
+strip = "debuginfo"
