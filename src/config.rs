@@ -152,7 +152,6 @@ mod tests {
     use std::process::{Command, Stdio};
 
     use crate::{
-        bridgehead::Bridgehead,
         modules,
         services::{BEAM_NETWORKS, ServiceMap},
     };
@@ -174,11 +173,9 @@ mod tests {
             modules::MODULES
                 .iter()
                 .for_each(|&m| services.install_module(m));
-            services.write_composables().unwrap();
             let has_beam_networks = BEAM_NETWORKS.with_borrow(|nets| !nets.is_empty());
+            services.write_all().unwrap();
             let has_services = services.len() > 0;
-            Bridgehead::new(&conf).write().unwrap();
-            conf.write_local_conf().unwrap();
             let tmp_dir_path = temp_dir.path().display().to_string();
             let filters = [(tmp_dir_path.as_str(), "[TMP_DIR]")];
             insta::glob!(temp_dir.path(), "**/*", |path| {

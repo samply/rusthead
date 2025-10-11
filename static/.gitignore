@@ -1,0 +1,7 @@
+
+.env
+config.local.toml
+/pki
+/trusted-ca-certs
+/traefik-tls
+docker-compose.override.yml

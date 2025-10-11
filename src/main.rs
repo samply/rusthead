@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use bridgehead::Bridgehead;
 use clap::Parser;
 use config::Config;
 use services::ServiceMap;
@@ -41,10 +40,6 @@ fn main() -> anyhow::Result<()> {
     modules::MODULES
         .iter()
         .for_each(|&m| services.install_module(m));
-    services
-        .write_composables()
-        .context("Failed to write services")?;
-    Bridgehead::new(&conf).write()?;
-    conf.write_local_conf()?;
+    services.write_all()?;
     Ok(())
 }

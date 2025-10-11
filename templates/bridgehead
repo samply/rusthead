@@ -4,6 +4,9 @@ set -o pipefail
 
 {%- let config_dir = conf.path|path %}
 {%- let priv_key_file = conf.path.join(format!("pki/{}.priv.pem", self.conf.site_id)) %}
+
+# Ensure the script is running in memory to avoid issues with self modification on update
+[ "$LOADED" = 1 ] || LOADED=1 exec bash <(cat "$0") "$@"
 cd {{ config_dir }}
 
 COMPOSE_FILES="$(ls services | awk '{print " -f services/" $0}')"
@@ -14,12 +17,19 @@ main() {
         install)
             [ "$(id -u)" -ne 0 ] && echo "Install command must be run as root." && exit 1
             useradd -M -g docker -N bridgehead &>/dev/null || echo "Using existing user bridgehead."
-            chown -R bridgehead:docker {{ config_dir }}
-            chmod -R g+sw {{ config_dir }}
+            chown -R bridgehead:docker .
+            chmod -R g+sw .
+            sudo -u bridgehead git init -b main
+            git config --global --add safe.directory {{ config_dir }}
+            git config --local user.email "bridgehead@samply.de"
+            git config --local user.name "Bridgehead"
+            {%- if let Some(proxy_url) = conf.https_proxy_url %}
+            git config --local http.proxy {{ proxy_url }}
+            git config --local https.proxy {{ proxy_url }}
+            {%- endif %}
             if ! systemctl list-units &> /dev/null; then
                 echo "Systemd is not active. Skipping systemd setup."
-                update
-                return
+                sudo -u bridgehead TAG=$TAG ./bridgehead update
             else
                 install_systemd
             fi
@@ -70,6 +80,14 @@ update() {
     env_hash=$(sha1sum .env | awk '{print $1}')
     services_hash=$(sha1sum services/* | awk '{print $1}')
     image_hashes=$(sha1sum docker-image.lock.yml | awk '{print $1}')
+    # Check if the repo is dirty and if it is print a warning and stash the changes
+    changes=$(git status --porcelain)
+    if [ -n "$changes" ]; then
+        echo -e "Warning: Repository is dirty:\n$changes\nStashing changes..."
+        git add . && git stash || true
+    fi
+    # TODO: Check if the bridgehead script changed and if so rerun
+    # TODO: Read tag from config
     docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
     docker run --rm \
         -v {{ config_dir }}:{{ config_dir }} \
@@ -86,11 +104,15 @@ update() {
     services_changed=$([ "$services_hash" != "$(sha1sum services/* | awk '{print $1}')" ] && echo true || echo false)
     images_changed=$([ "$image_hashes" != "$(sha1sum docker-image.lock.yml | awk '{print $1}')" ] && echo true || echo false)
 
-    if [ "$env_changed" = true ] || [ "$services_changed" = true ] || [ "$images_changed" = true ]; then
-        echo "Update completed. Changes detected in:"
-        [ "$env_changed" = true ] && echo "  - Environment configuration"
-        [ "$services_changed" = true ] && echo "  - Services configuration"
-        [ "$images_changed" = true ] && echo "  - Docker images" || true
+    changes=$(git status --porcelain)
+    if [ "$env_changed" = true ] || [ "$services_changed" = true ] || [ "$images_changed" = true ] || [ -n "$changes" ]; then
+        msg="Update completed. Changes detected in:"
+        [ "$env_changed" = true ] && msg+="\n  - Environment configuration"
+        [ "$services_changed" = true ] && msg+="\n  - Services configuration"
+        [ "$images_changed" = true ] && msg+="\n  - Docker images"
+        [ -n "$changes" ] && msg+="\nChanges: \n$changes"
+        git add .
+        echo -e "Updated bridgehead\n\n$msg" | git commit -F -
     else
         echo "Update completed. No changes detected - everything is up to date."
     fi
