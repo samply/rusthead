@@ -5,7 +5,7 @@ CONFIG_PATH := canonicalize(env("BRIDGEHEAD_CONFIG_PATH", "./bridgehead"))
 export TAG := env("TAG", "localbuild")
 
 run: build ensure_bootstrap
-  {{ CONFIG_PATH }}/bridgehead update
+  sudo -u bridgehead TAG=$TAG {{ CONFIG_PATH }}/bridgehead update
 
 up: down_bg run
   {{ CONFIG_PATH }}/bridgehead compose up

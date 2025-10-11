@@ -7,7 +7,7 @@ use std::{
 use anyhow::Context;
 use askama::Template;
 
-use crate::{Config, modules::Module};
+use crate::{Config, bridgehead::Bridgehead, modules::Module};
 
 mod postgres;
 mod teiler;
@@ -226,6 +226,18 @@ impl ServiceMap {
         self.map.len()
     }
 
+    pub fn write_all(&self) -> anyhow::Result<()> {
+        self.write_composables()
+            .context("Failed to write services")?;
+        Bridgehead::new(self.config).write()?;
+        self.config.write_local_conf()?;
+        fs::write(
+            self.config.path.join(".gitignore"),
+            include_str!("../../static/.gitignore"),
+        )?;
+        Ok(())
+    }
+
     pub fn get_mut<T: Any>(&mut self) -> Option<&mut T> {
         self.map
             .get_mut(&TypeId::of::<T>())
@@ -283,7 +295,7 @@ impl ServiceMap {
         m.install(self, &self.config);
     }
 
-    pub fn write_composables(&self) -> anyhow::Result<()> {
+    fn write_composables(&self) -> anyhow::Result<()> {
         let services_dir = self.config.path.join("services");
         _ = fs::remove_dir_all(&services_dir);
         fs::create_dir_all(&services_dir)?;
