@@ -220,9 +220,15 @@ mod tests {
                 )
                 .unwrap();
             }
+            fs::write(
+                temp_dir.path().join("docker-image.lock.yml"),
+                "services: {}\n",
+            )
+            .unwrap();
             let out = Command::new("./bridgehead")
                 .current_dir(temp_dir.path())
                 .stdout(Stdio::null())
+                .stderr(Stdio::piped())
                 .arg("compose")
                 .arg("config")
                 .spawn()
