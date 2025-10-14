@@ -7,6 +7,7 @@ use services::ServiceMap;
 
 mod bridgehead;
 mod config;
+mod git;
 mod modules;
 mod services;
 mod utils;
@@ -40,6 +41,9 @@ fn main() -> anyhow::Result<()> {
     modules::MODULES
         .iter()
         .for_each(|&m| services.install_module(m));
+    let before_hashes = git::hash_untracked_files(conf)?;
+    git::stash_if_dirty(conf)?;
     services.write_all()?;
+    let _needs_restart = git::commit_all(conf, &before_hashes, &git::hash_untracked_files(conf)?)?;
     Ok(())
 }
