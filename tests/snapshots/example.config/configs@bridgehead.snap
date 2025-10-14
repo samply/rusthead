@@ -59,55 +59,22 @@ main() {
             enroll
             ;;
         update)
-            update
+            docker image prune -f
+            # TODO: Check if the bridgehead script changed and if so rerun
+            # TODO: Read tag from config
+            docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
+            docker run --rm \
+                -v [TMP_DIR]:[TMP_DIR] \
+                -v /var/run/docker.sock:/var/run/docker.sock \
+                -e BRIDGEHEAD_CONFIG_PATH=[TMP_DIR] \
+                -u "$(id -u bridgehead):$(id -g bridgehead)" \
+                samply/rusthead:${TAG:-latest} update
             ;;
         *)
             echo "Unknown bridgehead command '$@'"
             exit 1
             ;;
     esac
-}
-
-update() {
-    env_hash=$(sha1sum .env | awk '{print $1}')
-    services_hash=$(sha1sum services/* | awk '{print $1}')
-    image_hashes=$(sha1sum docker-image.lock.yml | awk '{print $1}')
-    # Check if the repo is dirty and if it is print a warning and stash the changes
-    changes=$(git status --porcelain)
-    if [ -n "$changes" ]; then
-        echo -e "Warning: Repository is dirty:\n$changes\nStashing changes..."
-        git add . && git stash || true
-    fi
-    # TODO: Check if the bridgehead script changed and if so rerun
-    # TODO: Read tag from config
-    docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
-    docker run --rm \
-        -v [TMP_DIR]:[TMP_DIR] \
-        -e BRIDGEHEAD_CONFIG_PATH=[TMP_DIR] \
-        -u "$(id -u bridgehead):$(id -g bridgehead)" \
-        samply/rusthead:${TAG:-latest} update
-    docker image prune -f
-    # TODO: Check if we have any services
-    new_compose_files="$(ls services | awk '{print " -f services/" $0}')"
-    [ -e ./docker-compose.override.yml ] && new_compose_files+=" -f docker-compose.override.yml"
-    docker compose --env-file .env $new_compose_files pull
-    docker compose --env-file .env $new_compose_files config --lock-image-digests > docker-image.lock.yml
-    env_changed=$([ "$env_hash" != "$(sha1sum .env | awk '{print $1}')" ] && echo true || echo false)
-    services_changed=$([ "$services_hash" != "$(sha1sum services/* | awk '{print $1}')" ] && echo true || echo false)
-    images_changed=$([ "$image_hashes" != "$(sha1sum docker-image.lock.yml | awk '{print $1}')" ] && echo true || echo false)
-
-    changes=$(git status --porcelain)
-    if [ "$env_changed" = true ] || [ "$services_changed" = true ] || [ "$images_changed" = true ] || [ -n "$changes" ]; then
-        msg="Update completed. Changes detected in:"
-        [ "$env_changed" = true ] && msg+="\n  - Environment configuration"
-        [ "$services_changed" = true ] && msg+="\n  - Services configuration"
-        [ "$images_changed" = true ] && msg+="\n  - Docker images"
-        [ -n "$changes" ] && msg+="\nChanges: \n$changes"
-        git add .
-        echo -e "Updated bridgehead\n\n$msg" | git commit -F -
-    else
-        echo "Update completed. No changes detected - everything is up to date."
-    fi
 }
 enroll() {
     do_enroll() {
