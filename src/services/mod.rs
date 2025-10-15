@@ -235,6 +235,40 @@ impl ServiceMap {
             self.config.path.join(".gitignore"),
             include_str!("../../static/.gitignore"),
         )?;
+        #[cfg(not(test))]
+        self.generate_lockfile_and_pull()
+            .context("Failed to generate lockfile and pull images")?;
+        Ok(())
+    }
+
+    #[cfg(not(test))]
+    fn generate_lockfile_and_pull(&self) -> anyhow::Result<()> {
+        use std::process::Command;
+        let mut cmd = Command::new("docker-compose");
+        let mut pull_cmd = Command::new("docker-compose");
+        for service in self.map.values() {
+            let path = self
+                .config
+                .path
+                .join("services")
+                .join(format!("{}.yml", service.service_name()));
+            cmd.arg("-f").arg(&path);
+            pull_cmd.arg("-f").arg(&path);
+        }
+        if fs::exists(self.config.path.join("docker-compose.override.yml"))? {
+            cmd.arg("-f").arg("docker-compose.override.yml");
+            pull_cmd.arg("-f").arg("docker-compose.override.yml");
+        }
+        cmd.args(["--env-file", ".env", "config", "--lock-image-digests"])
+            .current_dir(&self.config.path);
+        pull_cmd
+            .args(["--env-file", ".env", "pull", "--quiet"])
+            .current_dir(&self.config.path);
+        let lockfile = cmd.output()?.stdout;
+        fs::write(self.config.path.join("docker-image.lock.yml"), lockfile)?;
+        if !pull_cmd.status()?.success() {
+            anyhow::bail!("Failed to pull images.");
+        }
         Ok(())
     }
 
