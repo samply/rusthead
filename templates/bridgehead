@@ -77,6 +77,7 @@ main() {
 }
 
 update() {
+    docker image prune -f
     env_hash=$(sha1sum .env | awk '{print $1}')
     services_hash=$(sha1sum services/* | awk '{print $1}')
     image_hashes=$(sha1sum docker-image.lock.yml | awk '{print $1}')
@@ -91,15 +92,11 @@ update() {
     docker pull samply/rusthead:${TAG:-latest} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
     docker run --rm \
         -v {{ config_dir }}:{{ config_dir }} \
+        -v /var/run/docker.sock:/var/run/docker.sock \
         -e BRIDGEHEAD_CONFIG_PATH={{ config_dir }} \
         -u "$(id -u bridgehead):$(id -g bridgehead)" \
         samply/rusthead:${TAG:-latest} update
-    docker image prune -f
     # TODO: Check if we have any services
-    new_compose_files="$(ls services | awk '{print " -f services/" $0}')"
-    [ -e ./docker-compose.override.yml ] && new_compose_files+=" -f docker-compose.override.yml"
-    docker compose --env-file .env $new_compose_files pull
-    docker compose --env-file .env $new_compose_files config --lock-image-digests > docker-image.lock.yml
     env_changed=$([ "$env_hash" != "$(sha1sum .env | awk '{print $1}')" ] && echo true || echo false)
     services_changed=$([ "$services_hash" != "$(sha1sum services/* | awk '{print $1}')" ] && echo true || echo false)
     images_changed=$([ "$image_hashes" != "$(sha1sum docker-image.lock.yml | awk '{print $1}')" ] && echo true || echo false)
