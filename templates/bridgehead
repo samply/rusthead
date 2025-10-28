@@ -68,7 +68,6 @@ main() {
         {%- endif %}
         update)
             docker image prune -f
-            # TODO: Check if the bridgehead script changed and if so rerun
             docker pull samply/rusthead:{{ conf.version_tag }} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
             docker run --rm \
                 -v {{ config_dir }}:{{ config_dir }} \

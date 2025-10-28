@@ -36,6 +36,10 @@ impl DiffTracker {
         } else {
             None
         };
+        if conf.git_sync.unwrap_or_else(|| tmp_self.has_remote()) {
+            println!("Pulling changes from remote");
+            tmp_self.pull()?;
+        }
         Ok(Self {
             stashed_changes,
             before_hashes: tmp_self
@@ -57,6 +61,12 @@ impl DiffTracker {
             .arg("status")
             .arg("--porcelain")
             .output()?;
+        if !status.status.success() {
+            anyhow::bail!(
+                "Failed to get status: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
         let files = String::from_utf8_lossy(&status.stdout);
         Ok(files.into_owned())
     }
@@ -68,7 +78,7 @@ impl DiffTracker {
             .output()?;
         if !status.status.success() {
             anyhow::bail!(
-                "Failed to get status: {}",
+                "Failed to get untracked files: {}",
                 String::from_utf8_lossy(&status.stderr)
             );
         }
@@ -155,7 +165,7 @@ impl DiffTracker {
                 ));
             }
         }
-        if let Some(stashed_changes) = self.stashed_changes {
+        if let Some(ref stashed_changes) = self.stashed_changes {
             cmd.arg("-m")
                 .arg(format!("stashed changes:\n{stashed_changes}"));
         }
@@ -166,7 +176,40 @@ impl DiffTracker {
                 String::from_utf8_lossy(&status.stdout)
             );
         }
+        if self.conf.git_sync.unwrap_or_else(|| self.has_remote()) {
+            println!("Pushing changes to remote");
+            self.push()?;
+        }
         Ok(!(git_diff.is_empty() && local_diff.is_empty()))
+    }
+
+    fn has_remote(&self) -> bool {
+        self.git_command()
+            .arg("remote")
+            .output()
+            .is_ok_and(|output| output.status.success() && !output.stdout.is_empty())
+    }
+
+    fn pull(&self) -> anyhow::Result<()> {
+        let output = self.git_command().arg("pull").arg("--rebase").output()?;
+        if !output.status.success() {
+            anyhow::bail!(
+                "Failed to pull changes: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Ok(())
+    }
+
+    fn push(&self) -> anyhow::Result<()> {
+        let output = self.git_command().arg("push").output()?;
+        if !output.status.success() {
+            anyhow::bail!(
+                "Failed to push changes: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Ok(())
     }
 }
 

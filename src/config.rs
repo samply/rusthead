@@ -26,6 +26,7 @@ pub struct Config {
     pub environment: Environment,
     #[serde(default = "latest")]
     pub version_tag: String,
+    pub git_sync: Option<bool>,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,

@@ -34,6 +34,7 @@ fn main() -> anyhow::Result<()> {
         }
         Args::Update { config } => config,
     };
+    // TODO: How do we handle config changes or bridgehead script changes after the initial git pull?
     let conf = Config::load(&conf_path)
         .with_context(|| format!("Failed to load config from {conf_path:?}"))?;
     let conf: &'static _ = Box::leak(Box::new(conf));
