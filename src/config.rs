@@ -24,6 +24,8 @@ pub struct Config {
     pub hostname: Host,
     #[serde(default)]
     pub environment: Environment,
+    #[serde(default = "latest")]
+    pub version_tag: String,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
@@ -32,6 +34,10 @@ pub struct Config {
 
     #[serde(skip)]
     pub local_conf: RefCell<LocalConf>,
+}
+
+fn latest() -> String {
+    "latest".to_string()
 }
 
 #[derive(Debug, Deserialize, Default)]

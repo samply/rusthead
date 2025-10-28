@@ -28,6 +28,7 @@ EOF
     read -p "Proxy [${HTTPS_PROXY:-None}]: " proxy
     proxy="${proxy:-$HTTPS_PROXY}"
     [ -n "$proxy" ] && echo "proxy = \"$proxy\"" >> "${config_dir}/config.toml"
+    [ -n "$TAG" ] && echo "version_tag = \"$TAG\"" >> "${config_dir}/config.toml"
 
     echo "Configuration file created at ${config_dir}/config.toml"
 else
