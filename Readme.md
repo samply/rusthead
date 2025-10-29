@@ -1,5 +1,5 @@
 
-# Rusthead (someone please think of a better name)
+# Rusthead
 
 A tool for generating a number of docker compose files based on some configuration taking into account dependency resolution and deduplication.
 
@@ -14,10 +14,10 @@ A tool for generating a number of docker compose files based on some configurati
 
 ### Service Example:
 #### Service implementation example:
-`src/services/my_serive.rs`:
+`src/services/my_service.rs`:
 ```rs
 #[derive(Template)]
-#[template("my_serive.yml")]
+#[template("my_service.yml")]
 struct MyService {
     some_prop: String,
 }

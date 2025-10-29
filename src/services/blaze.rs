@@ -47,7 +47,7 @@ impl<T: BlazeProvider> Service for Blaze<T> {
 pub trait BlazeProvider: 'static {
     fn balze_service_name() -> String;
 
-    /// relative path where this balze should be exposed thorugh traefik. Defaults to None
+    /// relative path where this balze should be exposed through traefik. Defaults to None
     fn treafik_exposure() -> Option<BlazeTraefikConfig> {
         None
     }
