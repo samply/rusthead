@@ -9,57 +9,165 @@ use anyhow::Context;
 
 use crate::config::Config;
 
-fn git_command(conf: &Config) -> Command {
-    let mut cmd = Command::new("git");
-    cmd.current_dir(&conf.path);
-    cmd
+type LocalDiffHashes = HashMap<String, u64>;
+
+pub struct DiffTracker {
+    conf: &'static Config,
+    before_hashes: LocalDiffHashes,
+    stashed_changes: Option<String>,
 }
 
-fn git_dirty(conf: &Config) -> anyhow::Result<bool> {
-    Ok(!get_modified(conf)?.is_empty())
-}
-
-fn get_modified(conf: &Config) -> anyhow::Result<String> {
-    let status = git_command(conf)
-        .arg("status")
-        .arg("--porcelain")
-        .output()?;
-    let files = String::from_utf8_lossy(&status.stdout);
-    Ok(files.into_owned())
-}
-
-fn git_add_all(conf: &Config) -> anyhow::Result<()> {
-    let status = git_command(conf).arg("add").arg(".").output()?;
-    if !status.status.success() {
-        anyhow::bail!(
-            "Failed to add changes: {}",
-            String::from_utf8_lossy(&status.stderr)
-        );
+impl DiffTracker {
+    pub fn start(conf: &'static Config) -> anyhow::Result<Self> {
+        let tmp_self = Self {
+            conf,
+            before_hashes: LocalDiffHashes::default(),
+            stashed_changes: None,
+        };
+        let git_diff = tmp_self.get_modified()?;
+        let stashed_changes = if !git_diff.is_empty() {
+            if tmp_self.is_initial_commit()? {
+                println!("No initial commit yet not stashing changes");
+                None
+            } else {
+                tmp_self.stash_all()?;
+                Some(git_diff)
+            }
+        } else {
+            None
+        };
+        Ok(Self {
+            stashed_changes,
+            before_hashes: tmp_self
+                .hash_untracked_files()
+                .context("Failed to start tracking local files")?,
+            ..tmp_self
+        })
     }
-    Ok(())
-}
 
-fn stash_all(conf: &Config) -> anyhow::Result<()> {
-    if is_initial_commit(conf)? {
-        println!("No initial commit yet not stashing changes");
-        return Ok(());
+    fn git_command(&self) -> Command {
+        let mut cmd = Command::new("git");
+        cmd.current_dir(&self.conf.path);
+        cmd
     }
-    git_add_all(conf)?;
-    let status = git_command(conf).arg("stash").output()?;
-    if !status.status.success() {
-        anyhow::bail!(
-            "Failed to stash changes: {}",
-            String::from_utf8_lossy(&status.stderr)
-        );
-    }
-    Ok(())
-}
 
-pub fn stash_if_dirty(conf: &Config) -> anyhow::Result<()> {
-    if git_dirty(conf)? {
-        stash_all(conf)?;
+    fn get_modified(&self) -> anyhow::Result<String> {
+        let status = self
+            .git_command()
+            .arg("status")
+            .arg("--porcelain")
+            .output()?;
+        let files = String::from_utf8_lossy(&status.stdout);
+        Ok(files.into_owned())
     }
-    Ok(())
+
+    fn hash_untracked_files(&self) -> anyhow::Result<LocalDiffHashes> {
+        let status = self
+            .git_command()
+            .args(["ls-files", "--others", "--exclude-standard", "--ignored"])
+            .output()?;
+        if !status.status.success() {
+            anyhow::bail!(
+                "Failed to get status: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
+        let output = String::from_utf8_lossy(&status.stdout);
+        let mut hash_map = LocalDiffHashes::default();
+        for file_path in output.lines() {
+            let mut hasher = DefaultHasher::new();
+            let path = self.conf.path.join(file_path);
+            let file = fs::read(&path)
+                .with_context(|| format!("Failed to read file: `{}`", path.display()))?;
+            hasher.write(&file);
+            hash_map.insert(file_path.to_string(), hasher.finish());
+        }
+        Ok(hash_map)
+    }
+
+    fn is_initial_commit(&self) -> anyhow::Result<bool> {
+        Ok(!self
+            .git_command()
+            .arg("rev-parse")
+            .arg("--verify")
+            .arg("HEAD")
+            .output()?
+            .status
+            .success())
+    }
+
+    fn stash_all(&self) -> anyhow::Result<()> {
+        let status = self
+            .git_command()
+            .args(["stash", "push", "-m", "auto-stash", "--include-untracked"])
+            .output()?;
+        if !status.status.success() {
+            anyhow::bail!(
+                "Failed to stash changes: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
+        Ok(())
+    }
+
+    fn git_add_all(&self) -> anyhow::Result<()> {
+        let status = self.git_command().arg("add").arg(".").output()?;
+        if !status.status.success() {
+            anyhow::bail!(
+                "Failed to add changes: {}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
+        Ok(())
+    }
+
+    /// Commit all changes to git. Return true if there were any changes to local or git tracked files.
+    pub fn commit(self) -> anyhow::Result<bool> {
+        let git_diff = self.get_modified()?;
+        let after_hashes = self.hash_untracked_files()?;
+        let local_diff = compute_local_file_diff(&self.before_hashes, &after_hashes);
+        let local_diff_str = local_diff
+            .iter()
+            .map(|(file, changed)| format!("{changed} {file}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut cmd = self.git_command();
+        cmd.arg("commit").arg("-m");
+        match (git_diff.is_empty(), local_diff.is_empty()) {
+            (true, true) => {
+                cmd.arg("Nothing changed");
+                cmd.arg("--allow-empty");
+            }
+            (true, false) => {
+                cmd.arg(format!(
+                    "Only local files changed\n\nlocal:\n{local_diff_str}"
+                ));
+                cmd.arg("--allow-empty");
+            }
+            (false, true) => {
+                self.git_add_all()?;
+                cmd.arg(format!("Git files changed\n\ngit:\n{git_diff}"));
+            }
+            (false, false) => {
+                self.git_add_all()?;
+                cmd.arg(format!(
+                    "Local files and git changed\n\ngit:\n{git_diff}\nlocal:\n{local_diff_str}"
+                ));
+            }
+        }
+        if let Some(stashed_changes) = self.stashed_changes {
+            cmd.arg("-m")
+                .arg(format!("stashed changes:\n{stashed_changes}"));
+        }
+        let status = cmd.output()?;
+        if !status.status.success() {
+            anyhow::bail!(
+                "Failed to commit changes: {}",
+                String::from_utf8_lossy(&status.stdout)
+            );
+        }
+        Ok(!(git_diff.is_empty() && local_diff.is_empty()))
+    }
 }
 
 fn compute_local_file_diff<'a>(
@@ -87,84 +195,4 @@ fn compute_local_file_diff<'a>(
     }
 
     diff
-}
-
-/// Commit all changes to git. Return true if there were any changes to local or git tracked files.
-pub fn commit_all(
-    conf: &Config,
-    before_hashes: &LocalDiffHashes,
-    after_hashes: &LocalDiffHashes,
-) -> anyhow::Result<bool> {
-    let git_diff = get_modified(conf)?;
-    let mut cmd = git_command(conf);
-    cmd.arg("commit").arg("-m");
-    let local_diff = compute_local_file_diff(before_hashes, after_hashes);
-    let local_diff_str = local_diff
-        .iter()
-        .map(|(file, changed)| format!("{changed} {file}"))
-        .collect::<Vec<_>>()
-        .join("\n");
-    match (git_diff.is_empty(), local_diff.is_empty()) {
-        (true, true) => {
-            cmd.arg("Nothing to update");
-            cmd.arg("--allow-empty");
-        }
-        (true, false) => {
-            cmd.arg(format!("Only local files changed\n\n{local_diff_str}"));
-            cmd.arg("--allow-empty");
-        }
-        (false, true) => {
-            git_add_all(conf)?;
-            cmd.arg(format!("Git files changed\n\n{git_diff}"));
-        }
-        (false, false) => {
-            git_add_all(conf)?;
-            cmd.arg(format!(
-                "Local files and git changed\n\n{git_diff}\nlocal:\n{local_diff_str}"
-            ));
-        }
-    }
-    let status = cmd.output()?;
-    if !status.status.success() {
-        anyhow::bail!(
-            "Failed to commit changes: {}",
-            String::from_utf8_lossy(&status.stdout)
-        );
-    }
-    Ok(!(git_diff.is_empty() && local_diff.is_empty()))
-}
-
-pub type LocalDiffHashes = HashMap<String, u64>;
-
-pub fn hash_untracked_files(conf: &Config) -> anyhow::Result<LocalDiffHashes> {
-    let status = git_command(conf)
-        .args(["ls-files", "--others", "--exclude-standard", "--ignored"])
-        .output()?;
-    if !status.status.success() {
-        anyhow::bail!(
-            "Failed to get status: {}",
-            String::from_utf8_lossy(&status.stderr)
-        );
-    }
-    let output = String::from_utf8_lossy(&status.stdout);
-    let mut hash_map = LocalDiffHashes::default();
-    for file_path in output.lines() {
-        let mut hasher = DefaultHasher::new();
-        let path = conf.path.join(file_path);
-        let file = fs::read(&path)
-            .with_context(|| format!("Failed to read file: `{}`", path.display()))?;
-        hasher.write(&file);
-        hash_map.insert(file_path.to_string(), hasher.finish());
-    }
-    Ok(hash_map)
-}
-
-fn is_initial_commit(conf: &Config) -> anyhow::Result<bool> {
-    Ok(!git_command(conf)
-        .arg("rev-parse")
-        .arg("--verify")
-        .arg("HEAD")
-        .output()?
-        .status
-        .success())
 }

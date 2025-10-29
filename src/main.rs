@@ -37,13 +37,12 @@ fn main() -> anyhow::Result<()> {
     let conf = Config::load(&conf_path)
         .with_context(|| format!("Failed to load config from {conf_path:?}"))?;
     let conf: &'static _ = Box::leak(Box::new(conf));
+    let diff_tracker = git::DiffTracker::start(conf)?;
     let mut services = ServiceMap::new(conf);
     modules::MODULES
         .iter()
         .for_each(|&m| services.install_module(m));
-    let before_hashes = git::hash_untracked_files(conf)?;
-    git::stash_if_dirty(conf)?;
     services.write_all()?;
-    let _needs_restart = git::commit_all(conf, &before_hashes, &git::hash_untracked_files(conf)?)?;
+    let _needs_restart = diff_tracker.commit()?;
     Ok(())
 }
