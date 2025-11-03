@@ -34,11 +34,21 @@ fn main() -> anyhow::Result<()> {
         }
         Args::Update { config } => config,
     };
-    // TODO: How do we handle config changes or bridgehead script changes after the initial git pull?
     let conf = Config::load(&conf_path)
         .with_context(|| format!("Failed to load config from {conf_path:?}"))?;
-    let conf: &'static _ = Box::leak(Box::new(conf));
-    let diff_tracker = git::DiffTracker::start(conf)?;
+    let conf: &'static mut Config = Box::leak(Box::new(conf));
+    let diff_tracker = match git::DiffTracker::start(&conf)? {
+        Some(tracker) => tracker,
+        // git pull updated the repo -> reload the config
+        None => {
+            println!("Reloading config...");
+            *conf = Config::load(&conf_path).with_context(|| {
+                format!("Failed to load config from {conf_path:?} after update")
+            })?;
+            git::DiffTracker::start(&conf)?
+                .expect("We just pulled so we should not need to reload the config again")
+        }
+    };
     let mut services = ServiceMap::new(conf);
     modules::MODULES
         .iter()

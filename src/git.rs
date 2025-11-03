@@ -11,14 +11,14 @@ use crate::config::Config;
 
 type LocalDiffHashes = HashMap<String, u64>;
 
-pub struct DiffTracker {
-    conf: &'static Config,
+pub struct DiffTracker<'a> {
+    conf: &'a Config,
     before_hashes: LocalDiffHashes,
     stashed_changes: Option<String>,
 }
 
-impl DiffTracker {
-    pub fn start(conf: &'static Config) -> anyhow::Result<Self> {
+impl<'a> DiffTracker<'a> {
+    pub fn start(conf: &'a Config) -> anyhow::Result<Option<Self>> {
         let tmp_self = Self {
             conf,
             before_hashes: LocalDiffHashes::default(),
@@ -37,16 +37,21 @@ impl DiffTracker {
             None
         };
         if conf.git_sync.unwrap_or_else(|| tmp_self.has_remote()) {
+            let repo_hash_before = tmp_self.head_hash()?.stdout;
             println!("Pulling changes from remote");
             tmp_self.pull()?;
+            let repo_hash_after = tmp_self.head_hash()?.stdout;
+            if repo_hash_before != repo_hash_after {
+                return Ok(None);
+            }
         }
-        Ok(Self {
+        Ok(Some(Self {
             stashed_changes,
             before_hashes: tmp_self
                 .hash_untracked_files()
                 .context("Failed to start tracking local files")?,
             ..tmp_self
-        })
+        }))
     }
 
     fn git_command(&self) -> Command {
@@ -96,14 +101,16 @@ impl DiffTracker {
     }
 
     fn is_initial_commit(&self) -> anyhow::Result<bool> {
-        Ok(!self
+        Ok(!self.head_hash()?.status.success())
+    }
+
+    fn head_hash(&self) -> anyhow::Result<std::process::Output> {
+        Ok(self
             .git_command()
             .arg("rev-parse")
             .arg("--verify")
             .arg("HEAD")
-            .output()?
-            .status
-            .success())
+            .output()?)
     }
 
     fn stash_all(&self) -> anyhow::Result<()> {
