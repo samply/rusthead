@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::ExitCode};
 
 use anyhow::Context;
 use clap::Parser;
@@ -28,11 +28,11 @@ enum Args {
     },
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<ExitCode> {
     let conf_path = match Args::parse() {
         Args::Bootstrap => {
             println!("{}", include_str!("../static/bootstrap.sh"));
-            return Ok(());
+            return Ok(ExitCode::SUCCESS);
         }
         Args::Update { config } => config,
     };
@@ -60,7 +60,15 @@ fn main() -> anyhow::Result<()> {
         .for_each(|&m| services.install_module(m));
     services.write_all()?;
     if let Some(diff_tracker) = diff_tracker {
-        let _needs_restart = diff_tracker.commit()?;
+        let needs_restart = diff_tracker.commit()?;
+        if needs_restart {
+            println!("Updated the bridgehead. Please restart");
+            Ok(ExitCode::from(3))
+        } else {
+            Ok(ExitCode::SUCCESS)
+        }
+    } else {
+        // Most likely a new installation
+        Ok(ExitCode::SUCCESS)
     }
-    Ok(())
 }
