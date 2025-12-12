@@ -27,8 +27,8 @@ main() {
             git config --local http.proxy {{ proxy_url }}
             git config --local https.proxy {{ proxy_url }}
             {%- endif %}
-            if ! systemctl list-units &> /dev/null; then
-                echo "Systemd is not active. Skipping systemd setup."
+            if ! systemctl status docker &> /dev/null; then
+                echo "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
                 sudo -u bridgehead ./bridgehead update
             else
                 install_systemd
