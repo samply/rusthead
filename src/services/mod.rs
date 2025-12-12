@@ -243,6 +243,9 @@ impl ServiceMap {
 
     #[cfg(not(test))]
     fn generate_lockfile_and_pull(&self) -> anyhow::Result<()> {
+        if self.map.is_empty() {
+            return Ok(());
+        }
         use std::process::Command;
         let mut cmd = Command::new("docker-compose");
         let mut pull_cmd = Command::new("docker-compose");
