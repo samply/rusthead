@@ -3,6 +3,11 @@
 
 A tool for generating a number of docker compose files based on some configuration taking into account dependency resolution and deduplication.
 
+# Work in progress
+
+The following documentation may be outdated and is very much developer focused.
+User focused documentation will be added soon.
+
 ## Adding a service
 
 1. Add a file to `src/services` and add it to the `mod.rs`.
