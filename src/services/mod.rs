@@ -283,6 +283,7 @@ impl ServiceMap {
     }
 
     #[must_use = "Ensure that the service actually got installed because all its deps were already installed"]
+    #[expect(unused)]
     pub fn install_with_config_cached_deps<T: Service>(
         &mut self,
         conf: T::ServiceConfig,

@@ -9,6 +9,10 @@ use anyhow::Context;
 
 use crate::config::Config;
 
+fn is_git_repo() -> bool {
+    fs::metadata(".git").map_or(false, |meta| meta.is_dir())
+}
+
 type LocalDiffHashes = HashMap<String, u64>;
 
 pub struct DiffTracker<'a> {
@@ -17,8 +21,17 @@ pub struct DiffTracker<'a> {
     stashed_changes: Option<String>,
 }
 
+pub enum DiffTrackerResult<'a> {
+    Success(DiffTracker<'a>),
+    NeedsConfigReload,
+    NotAGitRepo,
+}
+
 impl<'a> DiffTracker<'a> {
-    pub fn start(conf: &'a Config) -> anyhow::Result<Option<Self>> {
+    pub fn start(conf: &'a Config) -> anyhow::Result<DiffTrackerResult<'a>> {
+        if !is_git_repo() {
+            return Ok(DiffTrackerResult::NotAGitRepo);
+        }
         let tmp_self = Self {
             conf,
             before_hashes: LocalDiffHashes::default(),
@@ -42,10 +55,10 @@ impl<'a> DiffTracker<'a> {
             tmp_self.pull()?;
             let repo_hash_after = tmp_self.head_hash()?.stdout;
             if repo_hash_before != repo_hash_after {
-                return Ok(None);
+                return Ok(DiffTrackerResult::NeedsConfigReload);
             }
         }
-        Ok(Some(Self {
+        Ok(DiffTrackerResult::Success(Self {
             stashed_changes,
             before_hashes: tmp_self
                 .hash_untracked_files()

@@ -1,7 +1,7 @@
 set shell := ["bash", "-cue"]
 
 ARCH := `docker version --format '{{.Server.Arch}}'`
-CONFIG_PATH := canonicalize(env("BRIDGEHEAD_CONFIG_PATH", "./bridgehead"))
+CONFIG_PATH := env("BRIDGEHEAD_CONFIG_PATH", "./bridgehead")
 export TAG := env("TAG", "localbuild")
 
 run: build ensure_bootstrap

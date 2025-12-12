@@ -5,6 +5,8 @@ use clap::Parser;
 use config::Config;
 use services::ServiceMap;
 
+use crate::git::DiffTrackerResult;
+
 mod bridgehead;
 mod config;
 mod git;
@@ -38,22 +40,27 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("Failed to load config from {conf_path:?}"))?;
     let conf: &'static mut Config = Box::leak(Box::new(conf));
     let diff_tracker = match git::DiffTracker::start(&conf)? {
-        Some(tracker) => tracker,
+        DiffTrackerResult::Success(tracker) => Some(tracker),
         // git pull updated the repo -> reload the config
-        None => {
+        DiffTrackerResult::NeedsConfigReload => {
             println!("Reloading config...");
             *conf = Config::load(&conf_path).with_context(|| {
                 format!("Failed to load config from {conf_path:?} after update")
             })?;
-            git::DiffTracker::start(&conf)?
-                .expect("We just pulled so we should not need to reload the config again")
-        }
+            let DiffTrackerResult::Success(dt) = git::DiffTracker::start(&conf)? else {
+                anyhow::bail!("We just pulled so we should not need to reload the config again");
+            };
+            Some(dt)
+        },
+        DiffTrackerResult::NotAGitRepo => None,
     };
     let mut services = ServiceMap::new(conf);
     modules::MODULES
         .iter()
         .for_each(|&m| services.install_module(m));
     services.write_all()?;
-    let _needs_restart = diff_tracker.commit()?;
+    if let Some(diff_tracker) = diff_tracker {
+        let _needs_restart = diff_tracker.commit()?;
+    }
     Ok(())
 }
