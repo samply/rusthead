@@ -9,8 +9,8 @@ use anyhow::Context;
 
 use crate::config::Config;
 
-fn is_git_repo() -> bool {
-    fs::metadata(".git").map_or(false, |meta| meta.is_dir())
+fn is_git_repo(conf: &Config) -> bool {
+    fs::metadata(conf.path.join(".git")).map_or(false, |meta| meta.is_dir())
 }
 
 type LocalDiffHashes = HashMap<String, u64>;
@@ -29,7 +29,8 @@ pub enum DiffTrackerResult<'a> {
 
 impl<'a> DiffTracker<'a> {
     pub fn start(conf: &'a Config) -> anyhow::Result<DiffTrackerResult<'a>> {
-        if !is_git_repo() {
+        if !is_git_repo(conf) {
+            println!("Directory is not a git repository yet skipping diff tracking");
             return Ok(DiffTrackerResult::NotAGitRepo);
         }
         let tmp_self = Self {
