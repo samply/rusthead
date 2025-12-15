@@ -9,7 +9,7 @@ FROM debian:bookworm-slim AS git
 
 RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 
-FROM gcr.io/distroless/cc-debian12
+FROM gcr.io/distroless/cc-debian13
 ADD --chmod=+x https://github.com/docker/compose/releases/download/v2.40.0/docker-compose-linux-x86_64 /usr/local/bin/docker-compose
 
 COPY --from=git /usr/bin/git /usr/bin/git
