@@ -1,9 +1,7 @@
 ---
 source: src/config.rs
 expression: file
-info:
-  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
-  - bridgehead
+info: bridgehead
 input_file: tests/configs/example.config.toml
 ---
 #!/usr/bin/env bash
@@ -28,8 +26,8 @@ main() {
             git config --global --add safe.directory [TMP_DIR]
             git config --local user.email "bridgehead@samply.de"
             git config --local user.name "Bridgehead"
-            if ! systemctl list-units &> /dev/null; then
-                echo "Systemd is not active. Skipping systemd setup."
+            if ! systemctl status docker &> /dev/null; then
+                echo "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
                 sudo -u bridgehead ./bridgehead update
             else
                 install_systemd

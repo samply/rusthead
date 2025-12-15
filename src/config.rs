@@ -195,7 +195,7 @@ mod tests {
                         filters => filters,
                         input_file => &conf_path,
                         snapshot_path => format!("../tests/snapshots/{}", conf_path.file_stem().unwrap().display()),
-                        info => &(conf_path.to_string_lossy(), path.file_name().unwrap().to_string_lossy()),
+                        info => &path.strip_prefix(temp_dir.path()).unwrap(),
                     }, {
                         match path.file_name().and_then(|s| s.to_str()?.rsplit_once('.')) {
                             Some((_, "yml")) => insta::assert_snapshot!(file),

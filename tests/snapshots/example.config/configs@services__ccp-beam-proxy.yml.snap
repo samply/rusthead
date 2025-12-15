@@ -1,9 +1,7 @@
 ---
 source: src/config.rs
 expression: file
-info:
-  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
-  - ccp-beam-proxy.yml
+info: services/ccp-beam-proxy.yml
 input_file: tests/configs/example.config.toml
 ---
 services:

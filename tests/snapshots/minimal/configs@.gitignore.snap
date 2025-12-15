@@ -1,11 +1,10 @@
 ---
 source: src/config.rs
 expression: file
-info:
-  - /mnt/cache/git/rusthead/tests/configs/minimal.toml
-  - ".gitignore"
+info: ".gitignore"
 input_file: tests/configs/minimal.toml
 ---
+
 .env
 config.local.toml
 /pki

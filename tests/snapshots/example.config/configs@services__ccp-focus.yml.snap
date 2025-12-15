@@ -1,9 +1,7 @@
 ---
 source: src/config.rs
 expression: file
-info:
-  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
-  - ccp-focus.yml
+info: services/ccp-focus.yml
 input_file: tests/configs/example.config.toml
 ---
 services:

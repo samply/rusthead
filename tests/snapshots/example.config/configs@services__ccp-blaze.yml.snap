@@ -1,11 +1,10 @@
 ---
 source: src/config.rs
 expression: file
-info:
-  - /mnt/cache/git/rusthead/tests/configs/example.config.toml
-  - ccp-blaze.yml
+info: services/ccp-blaze.yml
 input_file: tests/configs/example.config.toml
 ---
+
 services:
   ccp-blaze:
     image: docker.verbis.dkfz.de/cache/samply/blaze:latest
