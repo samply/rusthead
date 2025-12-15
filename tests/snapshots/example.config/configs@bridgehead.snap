@@ -28,7 +28,14 @@ main() {
             git config --local user.name "Bridgehead"
             if ! systemctl status docker &> /dev/null; then
                 echo "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
+                set +e
                 sudo -u bridgehead ./bridgehead update
+                exit_code=$?
+                set -e
+                if [ "$exit_code" != "0" ] && [ "$exit_code" != "3" ]; then
+                    echo "Failed to update bridgehead"
+                    exit $exit_code
+                fi
             else
                 install_systemd
             fi
@@ -81,6 +88,7 @@ enroll() {
             --output-file [TMP_DIR]/pki/dummy.priv.pem \
             --proxy-id dummy.$1
         chmod 600 [TMP_DIR]/pki/dummy.priv.pem
+        chown bridgehead:docker [TMP_DIR]/pki/dummy.priv.pem
     }
     do_enroll broker.bbmri.samply.dedo_enroll broker.ccp-it.dktk.dkfz.de
     echo "After getting the csrs enrolled you may start the bridgehead service with 'systemctl start bridgehead'."
@@ -110,6 +118,7 @@ Requires=docker.service
 ExecStart=[TMP_DIR]/bridgehead update
 User=bridgehead
 Group=docker
+ExecStopPost=+/bin/bash -c 'if [ "\$EXIT_STATUS" = "3" ]; then systemctl restart bridgehead.service; fi'
 EOF
     cat <<EOF > /etc/systemd/system/bridgehead-update.timer
 [Unit]

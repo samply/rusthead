@@ -29,7 +29,14 @@ main() {
             {%- endif %}
             if ! systemctl status docker &> /dev/null; then
                 echo "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
+                set +e
                 sudo -u bridgehead ./bridgehead update
+                exit_code=$?
+                set -e
+                if [ "$exit_code" != "0" ] && [ "$exit_code" != "3" ]; then
+                    echo "Failed to update bridgehead"
+                    exit $exit_code
+                fi
             else
                 install_systemd
             fi
@@ -93,6 +100,7 @@ enroll() {
             --output-file {{ priv_key_file.display() }} \
             --proxy-id {{ conf.site_id }}.$1
         chmod 600 {{ priv_key_file.display() }}
+        chown bridgehead:docker {{ priv_key_file.display() }}
     }
     {% for broker in beam_networks -%}
         do_enroll {{ broker }}
@@ -125,6 +133,7 @@ Requires=docker.service
 ExecStart={{ config_dir }}/bridgehead update
 User=bridgehead
 Group=docker
+ExecStopPost=+/bin/bash -c 'if [ "\$EXIT_STATUS" = "3" ]; then systemctl restart bridgehead.service; fi'
 EOF
     cat <<EOF > /etc/systemd/system/bridgehead-update.timer
 [Unit]
