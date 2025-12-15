@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeSet, BTreeMap},
+    collections::{BTreeMap, BTreeSet},
     fs,
     marker::PhantomData,
     path::PathBuf,

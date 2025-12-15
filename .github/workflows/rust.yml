@@ -24,7 +24,7 @@ jobs:
         components: '[ "rusthead" ]'
         architectures: '[ "amd64" ]'
         test-via-script: false
-        ghcr-retention-policy: keep
+        cargo-fmt-check: true
     secrets:
         DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

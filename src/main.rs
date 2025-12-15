@@ -51,7 +51,7 @@ fn main() -> anyhow::Result<ExitCode> {
                 anyhow::bail!("We just pulled so we should not need to reload the config again");
             };
             Some(dt)
-        },
+        }
         DiffTrackerResult::NotAGitRepo => None,
     };
     let mut services = ServiceMap::new(conf);
