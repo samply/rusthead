@@ -28,6 +28,7 @@ pub mod filters {
 
     use askama::Values;
 
+    #[askama::filter_fn]
     pub fn path(p: &PathBuf, _: &dyn Values) -> askama::Result<String> {
         Ok(p.canonicalize()
             .map_err(|e| {
