@@ -20,7 +20,7 @@ rcgen = "0.14.6"
 
 [dev-dependencies]
 insta = { version = "1.46", features = ["filters", "glob", "toml"] }
-tempfile = "3.23"
+tempfile = "3.24"
 toml = { version = "*", features = ["preserve_order"] }
 
 [profile.dev]
