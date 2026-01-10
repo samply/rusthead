@@ -48,7 +48,7 @@ pub trait Service: ToCompose + 'static {
 pub trait ServiceTuple {
     type DepRefs<'t>;
 
-    fn get<'services>(services: &'services mut ServiceMap) -> Option<Self::DepRefs<'services>>;
+    fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services>;
 }
 
 macro_rules! service_tuple_option {
@@ -57,22 +57,6 @@ macro_rules! service_tuple_option {
         impl<$($ts: Service,)* $($opt_ts: Service,)*> ServiceTuple for ($($ts,)* $(Option<$opt_ts>,)*) {
             type DepRefs<'t> = ($(&'t mut $ts,)* $(Option<&'t mut $opt_ts>,)*);
 
-            fn get<'services>(services: &'services mut ServiceMap) -> Option<Self::DepRefs<'services>> {
-                let [$($ts,)* $($opt_ts,)*] = services.map.get_disjoint_mut([
-                    $(&TypeId::of::<$ts>(),)*
-                    $(&TypeId::of::<$opt_ts>(),)*
-                ]);
-                Some((
-                    // Required services must be present
-                    $((($ts?.as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap()),)*
-                    // Optional services may be absent
-                    $($opt_ts.map(|s| (s.as_mut() as &mut dyn Any).downcast_mut::<$opt_ts>().unwrap()),)*
-                ))
-            }
-        }
-
-        #[allow(unused, non_snake_case)]
-        impl<$($ts: DefaultService,)* $($opt_ts: Service,)*> DefaultServiceTuple for ($($ts,)* $(Option<$opt_ts>,)*) {
             fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services> {
                 // Ensure all required services are created
                 $(
@@ -118,17 +102,6 @@ macro_rules! service_tuple {
         impl<$($ts: Service,)*> ServiceTuple for ($($ts,)*) {
             type DepRefs<'t> = ($(&'t mut $ts,)*);
 
-            fn get<'services>(services: &'services mut ServiceMap) -> Option<Self::DepRefs<'services>> {
-                let [$($ts,)*] = services.map.get_disjoint_mut([
-                    $(&TypeId::of::<$ts>(),)*
-                ]);
-                // Try to get all services, return None if any is missing
-                Some(($(($ts?.as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap(),)*))
-            }
-        }
-
-        #[allow(unused, non_snake_case)]
-        impl<$($ts: DefaultService,)*> DefaultServiceTuple for ($($ts,)*) {
             fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services> {
                 // Ensure all services are created
                 $(
@@ -144,12 +117,9 @@ macro_rules! service_tuple {
                 ($(($ts.unwrap().as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap(),)*)
             }
         }
+
         option_helper!($($ts),*);
     };
-}
-
-pub trait DefaultServiceTuple: ServiceTuple {
-    fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services>;
 }
 
 pub trait DefaultService: Service {
@@ -160,7 +130,6 @@ impl<T> DefaultService for T
 where
     T: Service,
     T::ServiceConfig: 'static,
-    T::Dependencies: DefaultServiceTuple,
 {
     fn from_default_config(service_map: &mut ServiceMap) -> Self {
         let conf: T::ServiceConfig =
@@ -286,11 +255,7 @@ impl ServiceMap {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn install_with_config<T>(&mut self, conf: T::ServiceConfig) -> &mut T
-    where
-        T: Service,
-        T::Dependencies: DefaultServiceTuple,
-    {
+    pub fn install_with_config<T: Service>(&mut self, conf: T::ServiceConfig) -> &mut T {
         // Workaround for problem case #3
         // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
         if self.contains::<T>() {
