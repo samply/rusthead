@@ -12,8 +12,6 @@ set -o pipefail
 [ "$LOADED" = 1 ] || LOADED=1 exec bash <(cat "$0") "$@"
 cd [TMP_DIR]
 
-COMPOSE_FILES="$(ls services | awk '{print " -f services/" $0}')"
-[ -e ./docker-compose.override.yml ] && COMPOSE_FILES+=" -f docker-compose.override.yml"
 
 main() {
     case "$1" in
@@ -52,12 +50,14 @@ main() {
             exec journalctl -u bridgehead -u bridgehead-update -a $@
             ;;
         compose)
+            compose_files="$(ls services | awk '{print " -f services/" $0}')"
+            [ -e ./docker-compose.override.yml ] && compose_files+=" -f docker-compose.override.yml"
             if [ ! -f [TMP_DIR]/pki/dummy.priv.pem ]; then
                 echo "Beam private key not found. Please run 'sudo [TMP_DIR]/bridgehead enroll' first."
                 exit 1
             fi
             shift
-            exec docker compose -p bridgehead --env-file .env $COMPOSE_FILES -f docker-image.lock.yml $@
+            exec docker compose -p bridgehead --env-file .env $compose_files -f docker-image.lock.yml $@
             ;;
         enroll)
             [ "$(id -u)" -ne 0 ] && echo "Enroll must be run as root." && exit 1
