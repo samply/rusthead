@@ -9,6 +9,8 @@ use askama::Template;
 
 use crate::{Config, bridgehead::Bridgehead, modules::Module};
 
+mod exporter;
+pub use exporter::Exporter;
 mod postgres;
 mod teiler;
 pub use teiler::*;
@@ -74,8 +76,10 @@ macro_rules! service_tuple_option {
             fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services> {
                 // Ensure all required services are created
                 $(
-                    let service = $ts::from_default_config(services);
-                    services.insert(service);
+                    if !services.contains::<$ts>() {
+                        let service = $ts::from_default_config(services);
+                        services.insert(service);
+                    }
                 )*
                 let [$($ts,)* $($opt_ts,)*] = services.map.get_disjoint_mut([
                     $(&TypeId::of::<$ts>(),)*
@@ -128,8 +132,10 @@ macro_rules! service_tuple {
             fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services> {
                 // Ensure all services are created
                 $(
-                    let service = $ts::from_default_config(services);
-                    services.insert(service);
+                    if !services.contains::<$ts>() {
+                        let service = $ts::from_default_config(services);
+                        services.insert(service);
+                    }
                 )*
                 let [$($ts,)*] = services.map.get_disjoint_mut([
                     $(&TypeId::of::<$ts>(),)*
@@ -146,22 +152,6 @@ pub trait DefaultServiceTuple: ServiceTuple {
     fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services>;
 }
 
-trait FromConfig {
-    fn from_default_config(conf: &'static Config) -> Self;
-}
-
-impl FromConfig for &'static Config {
-    fn from_default_config(conf: &'static Config) -> Self {
-        conf
-    }
-}
-
-impl FromConfig for () {
-    fn from_default_config(_conf: &Config) -> Self {
-        ()
-    }
-}
-
 pub trait DefaultService: Service {
     fn from_default_config(service_map: &mut ServiceMap) -> Self;
 }
@@ -169,11 +159,22 @@ pub trait DefaultService: Service {
 impl<T> DefaultService for T
 where
     T: Service,
-    T::ServiceConfig: FromConfig,
+    T::ServiceConfig: 'static,
     T::Dependencies: DefaultServiceTuple,
 {
     fn from_default_config(service_map: &mut ServiceMap) -> Self {
-        let conf = T::ServiceConfig::from_default_config(service_map.config);
+        let conf: T::ServiceConfig =
+            if TypeId::of::<T::ServiceConfig>() == TypeId::of::<&'static Config>() {
+                unsafe { std::mem::transmute_copy::<&Config, _>(&service_map.config) }
+            } else if TypeId::of::<T::ServiceConfig>() == TypeId::of::<()>() {
+                unsafe { std::mem::transmute_copy(&()) }
+            } else {
+                panic!(
+                    "Cannot create {} because it needs to be constructed explicitly with {}",
+                    std::any::type_name::<T>(),
+                    std::any::type_name::<T::ServiceConfig>()
+                );
+            };
         let deps = T::Dependencies::get_or_create(service_map);
         T::from_config(conf, deps)
     }
@@ -283,21 +284,6 @@ impl ServiceMap {
 
     pub fn contains<T: ToCompose + Any>(&self) -> bool {
         self.map.contains_key(&TypeId::of::<T>())
-    }
-
-    #[must_use = "Ensure that the service actually got installed because all its deps were already installed"]
-    #[expect(unused)]
-    pub fn install_with_config_cached_deps<T: Service>(
-        &mut self,
-        conf: T::ServiceConfig,
-    ) -> &mut T {
-        // Workaround for problem case #3
-        // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
-        if self.contains::<T>() {
-            return self.get_mut().unwrap();
-        }
-        let s = T::from_config(conf, T::Dependencies::get(self).unwrap());
-        self.insert(s)
     }
 
     pub fn install_with_config<T>(&mut self, conf: T::ServiceConfig) -> &mut T

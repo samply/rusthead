@@ -128,6 +128,7 @@ impl<'a> DiffTracker<'a> {
     }
 
     fn stash_all(&self) -> anyhow::Result<()> {
+        println!("Stashing untracked changes:\n{}", self.get_modified()?);
         let status = self
             .git_command()
             .args(["stash", "push", "-m", "auto-stash", "--include-untracked"])

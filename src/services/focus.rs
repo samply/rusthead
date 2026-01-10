@@ -21,6 +21,8 @@ where
     blaze_url: Url,
     endpoint_type: String,
     tag: String,
+    /// (exporter_url, exporter_api_key)
+    exporter: Option<(String, String)>,
     beam_and_blaze: PhantomData<(Beam, Backend)>,
 }
 
@@ -41,10 +43,20 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
             blaze_url: blaze.get_url(),
             tag: tag.clone(),
             endpoint_type: "blaze".into(),
+            exporter: None,
         }
     }
 
     fn service_name() -> String {
         format!("{}-focus", T::network_name())
+    }
+}
+
+impl<Beam: BrokerProvider, Backend> Focus<Beam, Backend>
+where
+    Self: Service,
+{
+    pub fn enable_exporter(&mut self, exporter_url: String, exporter_api_key: String) {
+        self.exporter = Some((exporter_url, exporter_api_key));
     }
 }

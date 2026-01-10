@@ -9,3 +9,7 @@ services:
       RETRY_COUNT: 128
       EPSILON: 0.28
       ENDPOINT_TYPE: {{ endpoint_type }}
+    {%- if let Some((exporter_url, exporter_api_key)) = exporter %}
+      EXPORTER_URL: "{{ exporter_url }}"
+      EXPORTER_API_KEY: "{{ exporter_api_key }}"
+    {%- endif %}

@@ -1,0 +1,24 @@
+services:
+  {{ Self::service_name() }}:
+    image: docker.verbis.dkfz.de/{{ project }}/dktk-exporter:latest
+    container_name: bridgehead-{{ project }}-exporter
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
+      LOG_LEVEL: "INFO"
+      EXPORTER_API_KEY: "{{ api_key }}"
+      CROSS_ORIGINS: "https://{{ host }}"
+      EXPORTER_DB_USER: "{{ db_user }}"
+      EXPORTER_DB_PASSWORD: "{{ db_password }}"
+      EXPORTER_DB_URL: "jdbc:postgresql://{{ db_host }}:5432/{{ db_name }}"
+      HTTP_RELATIVE_PATH: "/{{ project }}-exporter"
+      BLAZE_URL: "http://{{ blaze_host }}:8080/fhir"
+      HTTP_SERVLET_REQUEST_SCHEME: "https"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.exporter_{{ project }}.rule=PathPrefix(`/{{ project }}-exporter`)"
+      - "traefik.http.services.exporter_{{ project }}.loadbalancer.server.port=8092"
+      - "traefik.http.routers.exporter_{{ project }}.tls=true"
+      - "traefik.http.middlewares.exporter_{{ project }}_strip.stripprefix.prefixes=/{{ project }}-exporter"
+      - "traefik.http.routers.exporter_{{ project }}.middlewares=exporter_{{ project }}_strip"
+    volumes:
+      - "/var/cache/bridgehead/{{ project }}/exporter-files:/app/exporter-files/output"

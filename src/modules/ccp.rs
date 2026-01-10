@@ -4,7 +4,7 @@ use serde::Deserialize;
 use url::Url;
 
 use crate::services::{
-    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Focus, IdManagement,
+    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Exporter, Focus, IdManagement,
     IdManagementConfig, OidcProvider, ServiceMap, Teiler, TeilerConfig, Transfair, TransfairConfig,
 };
 
@@ -16,8 +16,12 @@ pub struct CcpConfig {
     id_manager: Option<IdManagementConfig>,
     transfair: Option<TransfairConfig>,
     teiler: Option<TeilerConfig>,
+    exporter: Option<Empty>,
     pub datashield: Option<()>,
 }
+
+#[derive(Debug, Deserialize)]
+struct Empty {}
 
 pub struct CcpDefault;
 
@@ -35,6 +39,9 @@ impl Module for CcpDefault {
         }
         if let Some(teiler_conf) = &ccp_conf.teiler {
             service_map.install_with_config::<Teiler<Self>>((teiler_conf, conf));
+        }
+        if let Some(Empty {}) = &ccp_conf.exporter {
+            service_map.install_default::<Exporter<Self>>();
         }
     }
 }
