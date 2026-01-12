@@ -66,6 +66,7 @@ services:
       HTTP_PROXY: {{ forward_proxy_url }}
       {%- if let Some((exporter_host, _)) = exporter %}
       EXPORTER_CHECK_URL: "http://{{ exporter_host }}:8092/info"
+      REPORTER_CHECK_URL: "http://{{ project }}-reporter:8092/info"
       {%- endif %}
       ENABLE_MTBA: {{ mtba_enabled }}
       ENABLE_DATASHIELD: {{ datashield_enabled }}

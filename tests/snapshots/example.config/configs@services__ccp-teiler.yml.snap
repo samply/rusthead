@@ -69,6 +69,7 @@ services:
       TEILER_DASHBOARD_EN_URL: "/ccp-teiler-dashboard/en"
       HTTP_PROXY: http://forward-proxy:3128/
       EXPORTER_CHECK_URL: "http://ccp-exporter:8092/info"
+      REPORTER_CHECK_URL: "http://ccp-reporter:8092/info"
       ENABLE_MTBA: false
       ENABLE_DATASHIELD: false
       IDMANAGER_UPLOAD_APIKEY: "" # Used for health checks

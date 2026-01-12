@@ -1,7 +1,6 @@
 services:
   {{ Self::service_name() }}:
     image: docker.verbis.dkfz.de/{{ project }}/dktk-exporter:latest
-    container_name: bridgehead-{{ project }}-exporter
     environment:
       JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
       LOG_LEVEL: "INFO"
@@ -23,5 +22,28 @@ services:
     volumes:
       - "{{ Self::service_name() }}-files:/app/exporter-files/output"
 
+  {{ project }}-reporter:
+    image: docker.verbis.dkfz.de/ccp/dktk-reporter:latest
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
+      LOG_LEVEL: "INFO"
+      CROSS_ORIGINS: "https://{{ host }}"
+      HTTP_RELATIVE_PATH: "/{{ project }}-reporter"
+      EXPORTER_API_KEY: "{{ api_key }}"
+      EXPORTER_URL: "http://{{ Self::service_name() }}:8092"
+      LOG_FHIR_VALIDATION: "false"
+      HTTP_SERVLET_REQUEST_SCHEME: "https"
+    volumes:
+      - "{{ project }}-reporter-files:/app/reports"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.reporter_{{ project }}.rule=PathPrefix(`/{{ project }}-reporter`)"
+      - "traefik.http.services.reporter_{{ project }}.loadbalancer.server.port=8095"
+      - "traefik.http.routers.reporter_{{ project }}.tls=true"
+      - "traefik.http.middlewares.reporter_{{ project }}_strip.stripprefix.prefixes=/{{ project }}-reporter"
+      - "traefik.http.routers.reporter_{{ project }}.middlewares=reporter_{{ project }}_strip"
+
+
 volumes:
   {{ Self::service_name() }}-files:
+  {{ project }}-reporter-files:
