@@ -102,8 +102,8 @@ enroll() {
         chmod 600 {{ priv_key_file.display() }}
         chown bridgehead:docker {{ priv_key_file.display() }}
     }
-    {% for broker in beam_networks -%}
-        do_enroll {{ broker }}
+    {%- for broker in beam_networks %}
+    do_enroll {{ broker }}
     {%- endfor %}
     echo "After getting the csr{{ beam_networks.len()|pluralize }} enrolled you may start the bridgehead service with 'systemctl start bridgehead'."
 }

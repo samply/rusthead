@@ -90,7 +90,9 @@ enroll() {
         chmod 600 [TMP_DIR]/pki/dummy.priv.pem
         chown bridgehead:docker [TMP_DIR]/pki/dummy.priv.pem
     }
-    do_enroll broker.bbmri.dedo_enroll broker.bbmri.samply.dedo_enroll broker.ccp-it.dktk.dkfz.de
+    do_enroll broker.bbmri.de
+    do_enroll broker.bbmri.samply.de
+    do_enroll broker.ccp-it.dktk.dkfz.de
     echo "After getting the csrs enrolled you may start the bridgehead service with 'systemctl start bridgehead'."
 }
 
