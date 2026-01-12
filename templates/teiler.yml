@@ -1,31 +1,29 @@
 {% let name = Self::service_name() %}
 services:
-  teiler-orchestrator:
+  {{ name }}-orchestrator:
     image: docker.verbis.dkfz.de/cache/samply/teiler-orchestrator:latest
-    container_name: bridgehead-teiler-orchestrator
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.teiler_orchestrator_{{ project }}.rule=PathPrefix(`/{{ name }}`)"
-      - "traefik.http.services.teiler_orchestrator_{{ project }}.loadbalancer.server.port=9000"
-      - "traefik.http.routers.teiler_orchestrator_{{ project }}.tls=true"
-      - "traefik.http.middlewares.teiler_orchestrator_{{ project }}_strip.stripprefix.prefixes=/{{ name }}"
-      - "traefik.http.routers.teiler_orchestrator_{{ project }}.middlewares=teiler_orchestrator_{{ project }}_strip"
+      - "traefik.http.routers.{{ name }}_orchestrator.rule=PathPrefix(`/{{ name }}`)"
+      - "traefik.http.services.{{ name }}_orchestrator.loadbalancer.server.port=9000"
+      - "traefik.http.routers.{{ name }}_orchestrator.tls=true"
+      - "traefik.http.middlewares.{{ name }}_orchestrator_strip.stripprefix.prefixes=/{{ name }}"
+      - "traefik.http.routers.{{ name }}_orchestrator.middlewares={{ name }}_orchestrator_strip"
     environment:
       TEILER_BACKEND_URL: "/{{ name }}-backend"
       TEILER_DASHBOARD_URL: "/{{ name }}-dashboard"
       DEFAULT_LANGUAGE: "{{ conf.language.to_ascii_lowercase() }}"
       HTTP_RELATIVE_PATH: "/{{ name }}"
 
-  teiler-dashboard:
+  {{ name }}-dashboard:
     image: docker.verbis.dkfz.de/cache/samply/teiler-dashboard:latest
-    container_name: bridgehead-teiler-dashboard
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.teiler_dashboard_{{ project }}.rule=PathPrefix(`/{{ name }}-dashboard`)"
-      - "traefik.http.services.teiler_dashboard_{{ project }}.loadbalancer.server.port=80"
-      - "traefik.http.routers.teiler_dashboard_{{ project }}.tls=true"
-      - "traefik.http.middlewares.teiler_dashboard_{{ project }}_strip.stripprefix.prefixes=/{{ name }}-dashboard"
-      - "traefik.http.routers.teiler_dashboard_{{ project }}.middlewares=teiler_dashboard_{{ project }}_strip"
+      - "traefik.http.routers.{{ name }}_dashboard.rule=PathPrefix(`/{{ name }}-dashboard`)"
+      - "traefik.http.services.{{ name }}_dashboard.loadbalancer.server.port=80"
+      - "traefik.http.routers.{{ name }}_dashboard.tls=true"
+      - "traefik.http.middlewares.{{ name }}_dashboard_strip.stripprefix.prefixes=/{{ name }}-dashboard"
+      - "traefik.http.routers.{{ name }}_dashboard.middlewares={{ name }}_dashboard_strip"
     environment:
       DEFAULT_LANGUAGE: "{{ conf.language }}"
       TEILER_BACKEND_URL: "/{{ name }}-backend"
@@ -37,7 +35,9 @@ services:
       TEILER_ADMIN_EMAIL: ""
       TEILER_ADMIN_PHONE: ""
       TEILER_PROJECT: "{{ project }}"
-      EXPORTER_API_KEY: "{{ exporter_api_key }}"
+      {%- if let Some((_, api_key)) = exporter %}
+      EXPORTER_API_KEY: "{{ api_key }}"
+      {%- endif %}
       TEILER_ORCHESTRATOR_URL: "/{{ name }}"
       TEILER_ORCHESTRATOR_HTTP_RELATIVE_PATH: "/{{ name }}"
       TEILER_USER: "{{ oidc_user_group }}"
@@ -46,16 +46,15 @@ services:
       EXPORTER_DEFAULT_TEMPLATE_ID: "{{ project }}"
 
 
-  teiler-backend:
+  {{ name }}-backend:
     image: docker.verbis.dkfz.de/ccp/dktk-teiler-backend:latest
-    container_name: bridgehead-teiler-backend
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.teiler_backend_{{ project }}.rule=PathPrefix(`/{{ name }}-backend`)"
-      - "traefik.http.services.teiler_backend_{{ project }}.loadbalancer.server.port=8085"
-      - "traefik.http.routers.teiler_backend_{{ project }}.tls=true"
-      - "traefik.http.middlewares.teiler_backend_{{ project }}_strip.stripprefix.prefixes=/{{ name }}-backend"
-      - "traefik.http.routers.teiler_backend_{{ project }}.middlewares=teiler_backend_{{ project }}_strip"
+      - "traefik.http.routers.{{ name }}_backend.rule=PathPrefix(`/{{ name }}-backend`)"
+      - "traefik.http.services.{{ name }}_backend.loadbalancer.server.port=8085"
+      - "traefik.http.routers.{{ name }}_backend.tls=true"
+      - "traefik.http.middlewares.{{ name }}_backend_strip.stripprefix.prefixes=/{{ name }}-backend"
+      - "traefik.http.routers.{{ name }}_backend.middlewares={{ name }}_backend_strip"
     environment:
       LOG_LEVEL: "INFO"
       APPLICATION_PORT: "8085"
@@ -65,6 +64,9 @@ services:
       TEILER_DASHBOARD_DE_URL: "/{{ name }}-dashboard/de"
       TEILER_DASHBOARD_EN_URL: "/{{ name }}-dashboard/en"
       HTTP_PROXY: {{ forward_proxy_url }}
+      {%- if let Some((exporter_host, _)) = exporter %}
+      EXPORTER_CHECK_URL: "http://{{ exporter_host }}:8092/info"
+      {%- endif %}
       ENABLE_MTBA: {{ mtba_enabled }}
       ENABLE_DATASHIELD: {{ datashield_enabled }}
       IDMANAGER_UPLOAD_APIKEY: "{{ idm_upload_apikey.as_deref().unwrap_or_default() }}" # Used for health checks

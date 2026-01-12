@@ -7,7 +7,7 @@ use url::Url;
 use crate::{
     config::Config,
     modules::CcpDefault,
-    services::{ForwardProxy, IdManagement},
+    services::{Exporter, ForwardProxy, IdManagement},
     utils::capitalize_first_letter,
 };
 
@@ -32,7 +32,8 @@ where
     project_t: PhantomData<T>,
     oidc_client: PublicOidcClient,
     conf: &'static TeilerConfig,
-    exporter_api_key: String,
+    /// Exporter host and API key
+    exporter: Option<(String, String)>,
     project: String,
     mtba_enabled: bool,
     datashield_enabled: bool,
@@ -43,13 +44,17 @@ where
 }
 
 impl Service for Teiler<CcpDefault> {
-    type Dependencies = (ForwardProxy, Option<IdManagement<CcpDefault>>);
+    type Dependencies = (
+        ForwardProxy,
+        Option<IdManagement<CcpDefault>>,
+        Option<Exporter<CcpDefault>>,
+    );
 
     type ServiceConfig = (&'static TeilerConfig, &'static Config);
 
     fn from_config(
         (conf, global_conf): Self::ServiceConfig,
-        (fw_proxy, idm): super::Deps<Self>,
+        (fw_proxy, idm, exporter): super::Deps<Self>,
     ) -> Self {
         Self {
             project_t: PhantomData,
@@ -60,10 +65,7 @@ impl Service for Teiler<CcpDefault> {
             project: "ccp".to_string(),
             conf,
             forward_proxy_url: fw_proxy.get_url(),
-            exporter_api_key: global_conf
-                .local_conf
-                .borrow_mut()
-                .generate_secret::<10, Self>("exporter_api_key"),
+            exporter: exporter.map(|e| (Exporter::<CcpDefault>::service_name(), e.api_key.clone())),
             mtba_enabled: false,
             datashield_enabled: global_conf
                 .ccp

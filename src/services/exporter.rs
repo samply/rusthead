@@ -13,7 +13,7 @@ pub struct Exporter<T>
 where
     Self: Service,
 {
-    api_key: String,
+    pub api_key: String,
     host: String,
     db_password: String,
     db_host: String,

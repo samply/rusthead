@@ -37,11 +37,11 @@ impl Module for CcpDefault {
         if let Some(transfair_conf) = &ccp_conf.transfair {
             service_map.install_with_config::<Transfair<Self>>((transfair_conf, conf));
         }
-        if let Some(teiler_conf) = &ccp_conf.teiler {
-            service_map.install_with_config::<Teiler<Self>>((teiler_conf, conf));
-        }
         if let Some(Empty {}) = &ccp_conf.exporter {
             service_map.install_default::<Exporter<Self>>();
+        }
+        if let Some(teiler_conf) = &ccp_conf.teiler {
+            service_map.install_with_config::<Teiler<Self>>((teiler_conf, conf));
         }
     }
 }
