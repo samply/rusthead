@@ -28,7 +28,7 @@ impl<T: Service> Service for Postgres<T> {
             password: conf
                 .local_conf
                 .borrow_mut()
-                .generate_secret::<10, Self>("db_password"),
+                .generate_secret::<10, Self>("password"),
         }
     }
 

@@ -13,7 +13,7 @@ pub struct BbmriConfig {
     eric: bool,
     #[serde(default)]
     gbn: bool,
-    pub directory_sync: Option<DirectorySyncConfig>,
+    directory_sync: Option<DirectorySyncConfig>,
 }
 
 pub struct Bbmri;

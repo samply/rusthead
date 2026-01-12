@@ -1,0 +1,30 @@
+---
+source: src/config.rs
+expression: file
+info: services/ccp-exporter.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  ccp-exporter:
+    image: docker.verbis.dkfz.de/ccp/dktk-exporter:latest
+    container_name: bridgehead-ccp-exporter
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
+      LOG_LEVEL: "INFO"
+      EXPORTER_API_KEY: "${CCP_EXPORTER_API-KEY}"
+      CROSS_ORIGINS: "https://dummy.local"
+      EXPORTER_DB_USER: "ccp-exporter"
+      EXPORTER_DB_PASSWORD: "${CCP_EXPORTER_DB_PASSWORD}"
+      EXPORTER_DB_URL: "jdbc:postgresql://ccp-exporter-db:5432/ccp-exporter"
+      HTTP_RELATIVE_PATH: "/ccp-exporter"
+      BLAZE_URL: "http://ccp-blaze:8080/fhir"
+      HTTP_SERVLET_REQUEST_SCHEME: "https"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.exporter_ccp.rule=PathPrefix(`/ccp-exporter`)"
+      - "traefik.http.services.exporter_ccp.loadbalancer.server.port=8092"
+      - "traefik.http.routers.exporter_ccp.tls=true"
+      - "traefik.http.middlewares.exporter_ccp_strip.stripprefix.prefixes=/ccp-exporter"
+      - "traefik.http.routers.exporter_ccp.middlewares=exporter_ccp_strip"
+    volumes:
+      - "/var/cache/bridgehead/ccp/exporter-files:/app/exporter-files/output"

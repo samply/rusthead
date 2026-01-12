@@ -1,0 +1,17 @@
+---
+source: src/config.rs
+expression: file
+info: services/gbn-focus.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  gbn-focus:
+    image: docker.verbis.dkfz.de/cache/samply/focus:main-bbmri
+    environment:
+      BEAM_APP_ID_LONG: focus.dummy.broker.bbmri.de
+      BEAM_PROXY_URL: http://gbn-beam-proxy:8081/
+      BLAZE_URL: http://bbmri-blaze:8080/fhir/
+      API_KEY: "${GBN_BEAM_PROXY_FOCUS_KEY}"
+      RETRY_COUNT: 128
+      EPSILON: 0.28
+      ENDPOINT_TYPE: blaze

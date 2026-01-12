@@ -1,6 +1,12 @@
 site_id = "dummy"
 hostname = "dummy.local"
 
-[ccp]
+[ccp.teiler]
+[ccp.exporter]
 
 [bbmri]
+gbn = true
+
+[bbmri.directory_sync]
+username = "test"
+password = "test"
