@@ -16,4 +16,4 @@ services:
       EPSILON: 0.28
       ENDPOINT_TYPE: blaze
       EXPORTER_URL: "http://ccp-exporter:8080"
-      EXPORTER_API_KEY: "${CCP_EXPORTER_API-KEY}"
+      EXPORTER_API_KEY: "${CCP_EXPORTER_API_KEY}"

@@ -11,7 +11,7 @@ services:
     environment:
       JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
       LOG_LEVEL: "INFO"
-      EXPORTER_API_KEY: "${CCP_EXPORTER_API-KEY}"
+      EXPORTER_API_KEY: "${CCP_EXPORTER_API_KEY}"
       CROSS_ORIGINS: "https://dummy.local"
       EXPORTER_DB_USER: "ccp-exporter"
       EXPORTER_DB_PASSWORD: "${CCP_EXPORTER_DB_PASSWORD}"

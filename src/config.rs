@@ -127,11 +127,10 @@ impl LocalConf {
         let secret = crate::utils::secret_from_rng::<N>(&mut rng);
         let name = format!(
             "{}_{}",
-            <T as Service>::service_name()
-                .to_uppercase()
-                .replace("-", "_"),
+            <T as Service>::service_name().to_uppercase(),
             name.to_uppercase()
-        );
+        )
+        .replace("-", "_");
         let var = format!("${{{name}}}");
         self.generated_secrets.insert(name, secret);
         var
