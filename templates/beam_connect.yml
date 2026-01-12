@@ -1,0 +1,22 @@
+services:
+  {{ Self::service_name() }}:
+    image: docker.verbis.dkfz.de/cache/samply/beam-connect:develop
+    environment:
+      PROXY_URL: {{ beam_proxy_url }}
+      TLS_CA_CERTIFICATES_DIR: {{ trusted_ca_certs.display() }}
+      APP_ID: {{ beam_app_id }}
+      PROXY_APIKEY: {{ beam_api_key }}
+      DISCOVERY_URL: "./config/central-targets"
+      LOCAL_TARGETS_FILE: "./config/local-targets"
+      NO_AUTH: "true"
+    configs:
+      - local-targets
+      - central-targets
+
+configs:
+  local-targets:
+    content: |
+      {{ serde_json::to_string_pretty(&local_targets)? }}
+  central-targets:
+    content: |
+      {{ format_central_targets()? }}

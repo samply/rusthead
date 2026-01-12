@@ -9,6 +9,9 @@ use askama::Template;
 
 use crate::{Config, bridgehead::Bridgehead, modules::Module};
 
+mod beam_connect;
+#[expect(unused)]
+pub use beam_connect::BeamConnect;
 mod exporter;
 pub use exporter::Exporter;
 mod postgres;

@@ -880,6 +880,7 @@ dependencies = [
  "rand",
  "rcgen",
  "serde",
+ "serde_json",
  "tempfile",
  "toml",
  "url",
