@@ -6,7 +6,7 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1"
-bcrypt = "0.17.1"
+bcrypt = "0.18.0"
 rand = "0.9"
 askama = { version = "0.15", default-features = false, features = [
     "derive",
