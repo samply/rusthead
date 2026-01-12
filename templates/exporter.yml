@@ -21,4 +21,7 @@ services:
       - "traefik.http.middlewares.exporter_{{ project }}_strip.stripprefix.prefixes=/{{ project }}-exporter"
       - "traefik.http.routers.exporter_{{ project }}.middlewares=exporter_{{ project }}_strip"
     volumes:
-      - "/var/cache/bridgehead/{{ project }}/exporter-files:/app/exporter-files/output"
+      - "{{ Self::service_name() }}-files:/app/exporter-files/output"
+
+volumes:
+  {{ Self::service_name() }}-files:

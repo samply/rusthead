@@ -27,4 +27,7 @@ services:
       - "traefik.http.middlewares.exporter_ccp_strip.stripprefix.prefixes=/ccp-exporter"
       - "traefik.http.routers.exporter_ccp.middlewares=exporter_ccp_strip"
     volumes:
-      - "/var/cache/bridgehead/ccp/exporter-files:/app/exporter-files/output"
+      - "ccp-exporter-files:/app/exporter-files/output"
+
+volumes:
+  ccp-exporter-files:
