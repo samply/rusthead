@@ -4,7 +4,11 @@ use askama::Template;
 
 use crate::{
     config::Config,
-    services::{Blaze, BlazeProvider, BrokerProvider, Focus, Service, postgres::Postgres},
+    services::{
+        Blaze, BlazeProvider, BrokerProvider, Focus, OidcProvider, Service,
+        datashield::DataShield,
+        postgres::{PgConnectInfo, Postgres},
+    },
 };
 
 #[derive(Debug, Template)]
@@ -15,21 +19,19 @@ where
 {
     pub api_key: String,
     host: String,
-    db_password: String,
-    db_host: String,
-    db_name: String,
-    db_user: String,
+    opal_password: Option<String>,
+    db: PgConnectInfo,
     blaze_host: String,
     project: &'static str,
     deps: PhantomData<T>,
 }
 
-impl<T: BrokerProvider + BlazeProvider> Service for Exporter<T> {
-    type Dependencies = (Focus<T, Blaze<T>>, Postgres<Self>);
+impl<T: BrokerProvider + BlazeProvider + OidcProvider> Service for Exporter<T> {
+    type Dependencies = (Focus<T, Blaze<T>>, Postgres<Self>, Option<DataShield<T>>);
 
     type ServiceConfig = &'static Config;
 
-    fn from_config(conf: Self::ServiceConfig, (focus, pg): super::Deps<Self>) -> Self {
+    fn from_config(conf: Self::ServiceConfig, (focus, pg, ds): super::Deps<Self>) -> Self {
         let api_key = conf
             .local_conf
             .borrow_mut()
@@ -38,13 +40,21 @@ impl<T: BrokerProvider + BlazeProvider> Service for Exporter<T> {
             format!("http://{}:8080", Self::service_name()),
             api_key.clone(),
         );
+        let opal_password = if let Some(ds) = ds {
+            let opal_pw = conf
+                .local_conf
+                .borrow_mut()
+                .generate_secret::<10, Self>("opal-pw");
+            ds.exporter_password = Some(opal_pw.clone());
+            Some(opal_pw)
+        } else {
+            None
+        };
         Self {
             api_key,
             host: conf.hostname.to_string(),
-            db_password: pg.password.clone(),
-            db_name: pg.db.clone(),
-            db_user: pg.user.clone(),
-            db_host: <Postgres<Self> as Service>::service_name(),
+            opal_password,
+            db: pg.connect_info(),
             blaze_host: <Blaze<T> as Service>::service_name(),
             project: T::network_name(),
             deps: PhantomData,

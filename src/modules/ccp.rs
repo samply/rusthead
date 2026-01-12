@@ -3,9 +3,14 @@ use std::str::FromStr;
 use serde::Deserialize;
 use url::Url;
 
-use crate::services::{
-    Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, Exporter, Focus, IdManagement,
-    IdManagementConfig, OidcProvider, ServiceMap, Teiler, TeilerConfig, Transfair, TransfairConfig,
+use crate::{
+    config::Config,
+    services::{
+        Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, DataShield, Exporter, Focus,
+        IdManagement, IdManagementConfig, OidcProvider, ServiceMap, Teiler, TeilerConfig,
+        Transfair, TransfairConfig,
+    },
+    utils::capitalize_first_letter,
 };
 
 use super::Module;
@@ -17,7 +22,7 @@ pub struct CcpConfig {
     transfair: Option<TransfairConfig>,
     teiler: Option<TeilerConfig>,
     exporter: Option<Empty>,
-    pub datashield: Option<()>,
+    datashield: Option<Empty>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +41,9 @@ impl Module for CcpDefault {
         }
         if let Some(transfair_conf) = &ccp_conf.transfair {
             service_map.install_with_config::<Transfair<Self>>((transfair_conf, conf));
+        }
+        if let Some(Empty {}) = &ccp_conf.datashield {
+            service_map.install_default::<DataShield<Self>>();
         }
         if let Some(Empty {}) = &ccp_conf.exporter {
             service_map.install_default::<Exporter<Self>>();
@@ -95,5 +103,12 @@ impl OidcProvider for CcpDefault {
             "https://sso.verbis.dkfz.de/application/o/{private_client_id}/"
         ))
         .unwrap()
+    }
+
+    fn admin_group(conf: &Config) -> String {
+        format!(
+            "DKTK_CCP_{}_Verwalter",
+            capitalize_first_letter(&conf.site_id)
+        )
     }
 }

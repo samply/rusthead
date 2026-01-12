@@ -24,6 +24,7 @@ main() {
             git config --global --add safe.directory [TMP_DIR]
             git config --local user.email "bridgehead@samply.de"
             git config --local user.name "Bridgehead"
+            git config --local core.sharedRepository group
             if ! systemctl status docker &> /dev/null; then
                 echo "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
                 set +e

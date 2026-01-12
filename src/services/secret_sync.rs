@@ -250,4 +250,6 @@ pub trait OidcProvider: 'static {
     fn issuer_url(_public_client_id: &str) -> Url;
 
     fn private_issuer_url(_private_client_id: &str) -> Url;
+
+    fn admin_group(conf: &Config) -> String;
 }

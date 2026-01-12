@@ -1,0 +1,47 @@
+{% let project = T::network_name() %}
+
+services:
+  {{ opal_host() }}:
+    image: docker.verbis.dkfz.de/ccp/dktk-opal:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.opal_{{ project }}.rule=PathPrefix(`/{{ project }}-opal`)"
+      - "traefik.http.services.opal_{{ project }}.loadbalancer.server.port=8080"
+      - "traefik.http.routers.opal_{{ project }}.tls=true"
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC -Dhttps.proxyHost={{ fw_proxy_url.host_str().unwrap() }} -Dhttps.proxyPort={{ fw_proxy_url.port().unwrap() }}"
+      OPAL_ADMINISTRATOR_PASSWORD: "{{ opal_pw }}"
+      POSTGRESDATA_HOST: {{ db.host }}
+      POSTGRESDATA_DATABASE: {{ db.realm }}
+      POSTGRESDATA_USER: {{ db.user }}
+      POSTGRESDATA_PASSWORD: "{{ db.password }}"
+      ROCK_HOSTS: "{{ project }}-opal-rserver:8085"
+      APP_URL: "https://{{ host }}/{{ project }}-opal"
+      APP_CONTEXT_PATH: "/{{ project }}-opal"
+      OPAL_PRIVATE_KEY: "/certs/opal-key.pem"
+      OPAL_CERTIFICATE: "/certs/opal-cert.pem"
+      OIDC_URL: "{{ oidc.private_issuer_url() }}"
+      OIDC_CLIENT_ID: "{{ oidc.client_id() }}"
+      OIDC_CLIENT_SECRET: "{{ oidc.client_secret_var() }}"
+      OIDC_ADMIN_GROUP: "{{ oidc_admin_group }}"
+      TOKEN_MANAGER_PASSWORD: "{{ tm_pw }}"
+      {%- if let Some(exporter_password) = exporter_password %}
+      EXPORTER_PASSWORD: "{{ exporter_password }}"
+      {%- endif %}
+      BEAM_APP_ID: {{ tm_beam.id }}
+      BEAM_SECRET: {{ tm_beam.secret }}
+      BEAM_DATASHIELD_PROXY: request-manager
+    volumes:
+      - "{{ project }}-opal-metadata-db:/srv" # Opal metadata
+      - "{{ opal_key_path|path }}:/certs/opal-key.pem"
+      - "{{ opal_cert_path|path }}:/certs/opal-cert.pem"
+    depends_on:
+      - {{ db.host }}
+
+  {{ project }}-opal-rserver:
+    image: docker.verbis.dkfz.de/ccp/dktk-rserver # datashield/rock-base + dsCCPhos
+    tmpfs:
+      - /srv
+
+volumes:
+  {{ project }}-opal-metadata-db:

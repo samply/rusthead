@@ -36,8 +36,10 @@ services:
       - TOMCAT_REVERSEPROXY_FQDN={{ hostname }}
       - TOMCAT_REVERSEPROXY_SSL=true
       - ML_SITE={{ id }}
-      - ML_DB_HOST={{ Self::pg_name() }}
-      - ML_DB_PASS={{ postgres_pw }}
+      - ML_DB_HOST={{ db.host }}
+      - ML_DB_NAME={{ db.realm }}
+      - ML_DB_USER={{ db.user }}
+      - ML_DB_PASS={{ db.password }}
       - ML_API_KEY={{ local_apikey }}
       - ML_UPLOAD_API_KEY={{ conf.upload_apikey }}
       # Add Variables from /etc/patientlist-id-generators.env
@@ -52,7 +54,7 @@ services:
       - "traefik.http.services.patientlist.loadbalancer.server.port=8080"
       - "traefik.http.routers.patientlist.tls=true"
     depends_on:
-      - {{ Self::pg_name() }}
+      - {{ db.host }}
 
   idm-traefik-forward-auth:
     image: docker.verbis.dkfz.de/cache/oauth2-proxy/oauth2-proxy:latest

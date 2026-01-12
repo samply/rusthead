@@ -18,6 +18,7 @@ services:
       HTTP_RELATIVE_PATH: "/ccp-exporter"
       BLAZE_URL: "http://ccp-blaze:8080/fhir"
       HTTP_SERVLET_REQUEST_SCHEME: "https"
+      OPAL_PASSWORD: "${CCP_EXPORTER_OPAL_PW}"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.exporter_ccp.rule=PathPrefix(`/ccp-exporter`)"
@@ -27,6 +28,8 @@ services:
       - "traefik.http.routers.exporter_ccp.middlewares=exporter_ccp_strip"
     volumes:
       - "ccp-exporter-files:/app/exporter-files/output"
+    depends_on:
+      - ccp-exporter-db
 
   ccp-reporter:
     image: docker.verbis.dkfz.de/ccp/dktk-reporter:latest

@@ -64,10 +64,17 @@ services:
       TEILER_DASHBOARD_DE_URL: "/{{ name }}-dashboard/de"
       TEILER_DASHBOARD_EN_URL: "/{{ name }}-dashboard/en"
       HTTP_PROXY: {{ forward_proxy_url }}
+      BLAZE_CHECK_URL: http://{{ blaze_host }}:8080/fhir
       {%- if let Some((exporter_host, _)) = exporter %}
       EXPORTER_CHECK_URL: "http://{{ exporter_host }}:8092/info"
-      REPORTER_CHECK_URL: "http://{{ project }}-reporter:8092/info"
+      REPORTER_CHECK_URL: "http://{{ project }}-reporter:8095/info"
+      {%- endif %}
+      {%- if let Some(opal_host) = opal_host %}
+      OPAL_URL: "http://{{ host }}/{{ project }}-opal"
+      OPAL_CHECK_URL: "http://{{ opal_host }}:8080/{{ project }}-opal"
       {%- endif %}
       ENABLE_MTBA: {{ mtba_enabled }}
       ENABLE_DATASHIELD: {{ datashield_enabled }}
-      IDMANAGER_UPLOAD_APIKEY: "{{ idm_upload_apikey.as_deref().unwrap_or_default() }}" # Used for health checks
+      {%- if let Some(idm_upload_apikey) = idm_upload_apikey %}
+      IDMANAGER_UPLOAD_APIKEY: "{{ idm_upload_apikey }}" # Used for health checks
+      {%- endif %}

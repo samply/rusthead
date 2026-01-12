@@ -2,11 +2,10 @@ use std::{marker::PhantomData, path::PathBuf};
 
 use askama::Template;
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 use crate::{
     config::Config,
-    services::{BeamProxy, BrokerProvider, Service},
+    services::{BeamAppInfos, BeamProxy, BrokerProvider, Service},
 };
 
 #[derive(Template)]
@@ -16,13 +15,11 @@ pub struct BeamConnect<T>
 where
     Self: Service,
 {
-    beam_app_id: String,
-    beam_api_key: String,
-    beam_proxy_url: Url,
+    beam: BeamAppInfos,
     trusted_ca_certs: PathBuf,
     local_targets: Vec<LocalTarget>,
     central_targets: Vec<CentralTarget>,
-    beam: PhantomData<T>,
+    beam_provider: PhantomData<T>,
 }
 
 impl<T: BrokerProvider> Service for BeamConnect<T> {
@@ -31,15 +28,13 @@ impl<T: BrokerProvider> Service for BeamConnect<T> {
     type ServiceConfig = &'static Config;
 
     fn from_config(conf: Self::ServiceConfig, (beam,): super::Deps<Self>) -> Self {
-        let (beam_app_id, beam_api_key) = beam.add_service("beam-connect");
+        let beam = beam.add_service("beam-connect");
         Self {
-            beam_app_id,
-            beam_api_key,
-            beam_proxy_url: beam.get_url(),
+            beam,
             trusted_ca_certs: conf.trusted_ca_certs(),
             local_targets: vec![],
             central_targets: vec![],
-            beam: PhantomData,
+            beam_provider: PhantomData,
         }
     }
 
@@ -81,7 +76,6 @@ pub struct CentralTarget {
 }
 
 impl LocalTarget {
-    #[expect(unused)]
     pub fn new(external: String, internal: String, allowed: Vec<String>) -> Self {
         Self {
             external,
@@ -98,7 +92,6 @@ impl<T> BeamConnect<T>
 where
     Self: Service,
 {
-    #[expect(unused)]
     pub fn add_local_target(&mut self, target: LocalTarget) {
         self.local_targets.push(target);
     }

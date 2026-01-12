@@ -2,10 +2,10 @@ services:
   {{ Self::service_name() }}:
     image: docker.verbis.dkfz.de/cache/samply/focus:{{ tag }}
     environment:
-      BEAM_APP_ID_LONG: {{ beam_id }}
-      BEAM_PROXY_URL: {{ beam_url }}
+      BEAM_APP_ID_LONG: {{ beam.id }}
+      BEAM_PROXY_URL: {{ beam.url }}
       BLAZE_URL: {{ blaze_url }}fhir/
-      API_KEY: "{{ beam_secret }}"
+      API_KEY: "{{ beam.secret }}"
       RETRY_COUNT: 128
       EPSILON: 0.28
       ENDPOINT_TYPE: {{ endpoint_type }}

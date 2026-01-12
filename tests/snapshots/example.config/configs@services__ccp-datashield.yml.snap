@@ -1,0 +1,51 @@
+---
+source: src/config.rs
+expression: file
+info: services/ccp-datashield.yml
+input_file: tests/configs/example.config.toml
+---
+
+
+services:
+  ccp-opal:
+    image: docker.verbis.dkfz.de/ccp/dktk-opal:latest
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.opal_ccp.rule=PathPrefix(`/ccp-opal`)"
+      - "traefik.http.services.opal_ccp.loadbalancer.server.port=8080"
+      - "traefik.http.routers.opal_ccp.tls=true"
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC -Dhttps.proxyHost=forward-proxy -Dhttps.proxyPort=3128"
+      OPAL_ADMINISTRATOR_PASSWORD: "${CCP_DATASHIELD_OPAL_ADMIN}"
+      POSTGRESDATA_HOST: ccp-datashield-db
+      POSTGRESDATA_DATABASE: ccp-datashield
+      POSTGRESDATA_USER: ccp-datashield
+      POSTGRESDATA_PASSWORD: "${CCP_DATASHIELD_DB_PASSWORD}"
+      ROCK_HOSTS: "ccp-opal-rserver:8085"
+      APP_URL: "https://dummy.local/ccp-opal"
+      APP_CONTEXT_PATH: "/ccp-opal"
+      OPAL_PRIVATE_KEY: "/certs/opal-key.pem"
+      OPAL_CERTIFICATE: "/certs/opal-cert.pem"
+      OIDC_URL: "https://sso.verbis.dkfz.de/application/o/dummy-private/"
+      OIDC_CLIENT_ID: "dummy-private"
+      OIDC_CLIENT_SECRET: "${OIDC_CCP_CLIENT_SECRET}"
+      OIDC_ADMIN_GROUP: "DKTK_CCP_Dummy_Verwalter"
+      TOKEN_MANAGER_PASSWORD: "${CCP_DATASHIELD_TOKEN_MANAGER}"
+      EXPORTER_PASSWORD: "${CCP_EXPORTER_OPAL_PW}"
+      BEAM_APP_ID: token-manager.dummy.broker.ccp-it.dktk.dkfz.de
+      BEAM_SECRET: ${CCP_BEAM_PROXY_TOKEN_MANAGER_KEY}
+      BEAM_DATASHIELD_PROXY: request-manager
+    volumes:
+      - "ccp-opal-metadata-db:/srv" # Opal metadata
+      - "[TMP_DIR]/pki/ccp-opal.priv.pem:/certs/opal-key.pem"
+      - "[TMP_DIR]/trusted-ca-certs/opal-cert.pem:/certs/opal-cert.pem"
+    depends_on:
+      - ccp-datashield-db
+
+  ccp-opal-rserver:
+    image: docker.verbis.dkfz.de/ccp/dktk-rserver # datashield/rock-base + dsCCPhos
+    tmpfs:
+      - /srv
+
+volumes:
+  ccp-opal-metadata-db:

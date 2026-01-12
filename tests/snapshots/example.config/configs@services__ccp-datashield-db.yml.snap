@@ -1,0 +1,18 @@
+---
+source: src/config.rs
+expression: file
+info: services/ccp-datashield-db.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  ccp-datashield-db:
+    image: docker.verbis.dkfz.de/cache/postgres:15.6-alpine
+    environment:
+      POSTGRES_USER: ccp-datashield
+      POSTGRES_DB: ccp-datashield
+      POSTGRES_PASSWORD: ${CCP_DATASHIELD_DB_PASSWORD}
+    volumes:
+      - "ccp-datashield-db:/var/lib/postgresql/data"
+
+volumes:
+  ccp-datashield-db:

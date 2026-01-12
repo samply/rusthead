@@ -30,7 +30,8 @@ impl Module for Bbmri {
         service_map.install_default::<Blaze<Self>>();
         if bbmri_conf.eric {
             if let Environment::Acceptance = conf.environment {
-                service_map.install_with_config::<Focus<EricAcc, Blaze<Self>>>("main-bbmri".into());
+                service_map
+                    .install_with_config::<Focus<EricAcc, Blaze<Self>>>("develop-bbmri".into());
             } else {
                 service_map.install_with_config::<Focus<Eric, Blaze<Self>>>("main-bbmri".into());
             }

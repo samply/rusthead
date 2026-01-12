@@ -7,7 +7,9 @@ use url::Url;
 use crate::{
     config::Config,
     modules::CcpDefault,
-    services::{Exporter, ForwardProxy, IdManagement},
+    services::{
+        BlazeProvider, Exporter, ForwardProxy, IdManagement, OidcProvider, datashield::DataShield,
+    },
     utils::capitalize_first_letter,
 };
 
@@ -34,13 +36,16 @@ where
     conf: &'static TeilerConfig,
     /// Exporter host and API key
     exporter: Option<(String, String)>,
-    project: String,
+    project: &'static str,
+    host: String,
+    blaze_host: String,
     mtba_enabled: bool,
     datashield_enabled: bool,
     idm_upload_apikey: Option<String>,
     forward_proxy_url: Url,
     oidc_user_group: String,
     oidc_admin_group: String,
+    opal_host: Option<String>,
 }
 
 impl Service for Teiler<CcpDefault> {
@@ -48,13 +53,14 @@ impl Service for Teiler<CcpDefault> {
         ForwardProxy,
         Option<IdManagement<CcpDefault>>,
         Option<Exporter<CcpDefault>>,
+        Option<DataShield<CcpDefault>>,
     );
 
     type ServiceConfig = (&'static TeilerConfig, &'static Config);
 
     fn from_config(
         (conf, global_conf): Self::ServiceConfig,
-        (fw_proxy, idm, exporter): super::Deps<Self>,
+        (fw_proxy, idm, exporter, ds): super::Deps<Self>,
     ) -> Self {
         Self {
             project_t: PhantomData,
@@ -62,21 +68,18 @@ impl Service for Teiler<CcpDefault> {
                 global_conf,
                 &format!("/{}", Self::service_name()),
             ),
-            project: "ccp".to_string(),
+            project: CcpDefault::network_name(),
             conf,
             forward_proxy_url: fw_proxy.get_url(),
             exporter: exporter.map(|e| (Exporter::<CcpDefault>::service_name(), e.api_key.clone())),
+            host: global_conf.hostname.to_string(),
+            blaze_host: CcpDefault::balze_service_name(),
             mtba_enabled: false,
-            datashield_enabled: global_conf
-                .ccp
-                .as_ref()
-                .is_some_and(|c| c.datashield.is_some()),
+            datashield_enabled: ds.is_some(),
             idm_upload_apikey: idm.map(|idm| idm.conf.upload_apikey.clone()),
             oidc_user_group: format!("DKTK_CCP_{}", capitalize_first_letter(&global_conf.site_id)),
-            oidc_admin_group: format!(
-                "DKTK_CCP_{}_Verwalter",
-                capitalize_first_letter(&global_conf.site_id)
-            ),
+            oidc_admin_group: CcpDefault::admin_group(global_conf),
+            opal_host: ds.map(|ds| ds.opal_host()),
         }
     }
 

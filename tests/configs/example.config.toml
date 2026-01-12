@@ -1,8 +1,10 @@
 site_id = "dummy"
 hostname = "dummy.local"
 
-[ccp.teiler]
-[ccp.exporter]
+[ccp]
+teiler = {}
+exporter = {}
+datashield = {}
 
 [bbmri]
 gbn = true

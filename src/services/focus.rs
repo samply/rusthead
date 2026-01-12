@@ -3,6 +3,8 @@ use std::marker::PhantomData;
 use askama::Template;
 use url::Url;
 
+use crate::services::BeamAppInfos;
+
 use super::{
     Deps, Service,
     beam::{BeamProxy, BrokerProvider},
@@ -15,9 +17,7 @@ pub struct Focus<Beam: BrokerProvider, Backend>
 where
     Self: Service,
 {
-    beam_id: String,
-    beam_secret: String,
-    beam_url: Url,
+    beam: BeamAppInfos,
     blaze_url: Url,
     endpoint_type: String,
     tag: String,
@@ -34,12 +34,10 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
     where
         Self: Sized,
     {
-        let (beam_id, beam_secret) = beam_proxy.add_service("focus");
+        let beam = beam_proxy.add_service("focus");
         Focus {
+            beam,
             beam_and_blaze: PhantomData,
-            beam_id,
-            beam_secret,
-            beam_url: beam_proxy.get_url(),
             blaze_url: blaze.get_url(),
             tag: tag.clone(),
             endpoint_type: "blaze".into(),

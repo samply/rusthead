@@ -1,0 +1,42 @@
+---
+source: src/config.rs
+expression: file
+info: services/ccp-beam-connect.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  ccp-beam-connect:
+    image: docker.verbis.dkfz.de/cache/samply/beam-connect:develop
+    environment:
+      PROXY_URL: http://ccp-beam-proxy:8081/
+      TLS_CA_CERTIFICATES_DIR: /trusted_ca_certs
+      APP_ID: beam-connect.dummy.broker.ccp-it.dktk.dkfz.de
+      PROXY_APIKEY: ${CCP_BEAM_PROXY_BEAM_CONNECT_KEY}
+      DISCOVERY_URL: "./central-targets"
+      LOCAL_TARGETS_FILE: "./local-targets"
+      NO_AUTH: "true"
+    volumes:
+      - [TMP_DIR]/trusted-ca-certs:/trusted_ca_certs/:ro
+    configs:
+      - local-targets
+      - central-targets
+
+configs:
+  local-targets:
+    content: |
+      [
+        {
+          "external": "dummy:443",
+          "internal": "ccp-opal:8443",
+          "allowed": [
+            "central-ds-orchestrator.broker.ccp-it.dktk.dkfz.de"
+          ],
+          "forceHttps": false,
+          "resetHost": false
+        }
+      ]
+  central-targets:
+    content: |
+      {
+        "sites": []
+      }

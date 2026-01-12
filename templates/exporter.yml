@@ -6,12 +6,15 @@ services:
       LOG_LEVEL: "INFO"
       EXPORTER_API_KEY: "{{ api_key }}"
       CROSS_ORIGINS: "https://{{ host }}"
-      EXPORTER_DB_USER: "{{ db_user }}"
-      EXPORTER_DB_PASSWORD: "{{ db_password }}"
-      EXPORTER_DB_URL: "jdbc:postgresql://{{ db_host }}:5432/{{ db_name }}"
+      EXPORTER_DB_USER: "{{ db.user }}"
+      EXPORTER_DB_PASSWORD: "{{ db.password }}"
+      EXPORTER_DB_URL: "jdbc:postgresql://{{ db.host }}:5432/{{ db.realm }}"
       HTTP_RELATIVE_PATH: "/{{ project }}-exporter"
       BLAZE_URL: "http://{{ blaze_host }}:8080/fhir"
       HTTP_SERVLET_REQUEST_SCHEME: "https"
+      {%- if let Some(opal_password) = opal_password %}
+      OPAL_PASSWORD: "{{ opal_password }}"
+      {%- endif %}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.exporter_{{ project }}.rule=PathPrefix(`/{{ project }}-exporter`)"
@@ -21,6 +24,8 @@ services:
       - "traefik.http.routers.exporter_{{ project }}.middlewares=exporter_{{ project }}_strip"
     volumes:
       - "{{ Self::service_name() }}-files:/app/exporter-files/output"
+    depends_on:
+      - {{ db.host }}
 
   {{ project }}-reporter:
     image: docker.verbis.dkfz.de/ccp/dktk-reporter:latest

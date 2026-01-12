@@ -1,11 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::BTreeMap,
-    fs,
-    ops::Deref,
-    path::PathBuf,
-    sync::{Mutex, OnceLock},
-};
+use std::{cell::RefCell, collections::BTreeMap, fs, ops::Deref, path::PathBuf};
 
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
@@ -30,6 +23,7 @@ pub struct Config {
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
+    /// Path to the folder in which this config.toml was located
     #[serde(skip)]
     pub path: PathBuf,
 
@@ -119,18 +113,15 @@ impl Default for LocalConf {
 impl LocalConf {
     #[must_use]
     pub fn generate_secret<const N: usize, T: Service>(&mut self, name: &str) -> String {
-        static RNG: OnceLock<Mutex<StdRng>> = OnceLock::new();
-        let mut rng = RNG
-            .get_or_init(|| StdRng::seed_from_u64(self.seed as u64).into())
-            .lock()
-            .unwrap();
-        let secret = crate::utils::secret_from_rng::<N>(&mut rng);
         let name = format!(
             "{}_{}",
             <T as Service>::service_name().to_uppercase(),
             name.to_uppercase()
         )
         .replace("-", "_");
+        let salt = name.chars().fold(0, |a, b| a as u64 ^ b as u64);
+        let mut rng = StdRng::seed_from_u64(self.seed as u64 ^ salt);
+        let secret = crate::utils::secret_from_rng::<N>(&mut rng);
         let var = format!("${{{name}}}");
         self.generated_secrets.insert(name, secret);
         var

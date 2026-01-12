@@ -10,7 +10,9 @@ services:
     environment:
       BROKER_URL: https://broker.ccp-it.dktk.dkfz.de/
       PROXY_ID: dummy.broker.ccp-it.dktk.dkfz.de
+      APP_beam-connect_KEY: "${CCP_BEAM_PROXY_BEAM_CONNECT_KEY}"
       APP_focus_KEY: "${CCP_BEAM_PROXY_FOCUS_KEY}"
+      APP_token-manager_KEY: "${CCP_BEAM_PROXY_TOKEN_MANAGER_KEY}"
       ROOTCERT_FILE: /conf/root.crt.pem
       PRIVKEY_FILE: /run/secrets/proxy.pem
       TLS_CA_CERTIFICATES_DIR: /conf/trusted-ca-certs

@@ -17,7 +17,6 @@ pub struct Traefik {
 }
 
 impl Traefik {
-    // TODO: persist to some local.config.toml or smth maybe with toml_edit
     pub fn add_basic_auth_user(&mut self, middleware_name: String) {
         let mut local_conf = self.local_conf.borrow_mut();
         let pw = crate::utils::secret_from_rng::<10>(&mut rand::rng());

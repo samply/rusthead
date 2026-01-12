@@ -21,6 +21,7 @@ main() {
             git config --global --add safe.directory {{ config_dir }}
             git config --local user.email "bridgehead@samply.de"
             git config --local user.name "Bridgehead"
+            git config --local core.sharedRepository group
             {%- if let Some(proxy_url) = conf.https_proxy_url %}
             git config --local http.proxy {{ proxy_url }}
             git config --local https.proxy {{ proxy_url }}

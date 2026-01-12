@@ -11,9 +11,31 @@ where
     Self: Service,
 {
     r#for: PhantomData<T>,
+    user: String,
+    password: String,
+    realm: String,
+}
+
+#[derive(Debug)]
+pub struct PgConnectInfo {
+    pub host: String,
     pub user: String,
-    pub db: String,
+    pub realm: String,
     pub password: String,
+}
+
+impl<T> Postgres<T>
+where
+    Self: Service,
+{
+    pub fn connect_info(&self) -> PgConnectInfo {
+        PgConnectInfo {
+            host: Self::service_name(),
+            user: self.user.clone(),
+            realm: self.realm.clone(),
+            password: self.password.clone(),
+        }
+    }
 }
 
 impl<T: Service> Service for Postgres<T> {
@@ -24,7 +46,7 @@ impl<T: Service> Service for Postgres<T> {
         Self {
             r#for: PhantomData,
             user: <T as Service>::service_name(),
-            db: <T as Service>::service_name(),
+            realm: <T as Service>::service_name(),
             password: conf
                 .local_conf
                 .borrow_mut()
