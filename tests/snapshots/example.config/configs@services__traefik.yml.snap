@@ -21,6 +21,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.middlewares.bbmri-blaze.basicauth.users=bbmri-blaze:<hash>"
       - "traefik.http.middlewares.ccp-blaze.basicauth.users=ccp-blaze:<hash>"
+      - "traefik.http.middlewares.ccp-obds2fhir-auth.basicauth.users=ccp-obds2fhir-auth:<hash>"
     ports:
       - 80:80
       - 443:443

@@ -68,7 +68,7 @@ impl<T: BlazeProvider> Service for Transfair<T> {
     type Dependencies = (Blaze<T>,);
     type ServiceConfig = (&'static TransfairConfig, &'static crate::Config);
 
-    fn from_config((conf, global_conf): Self::ServiceConfig, (blaze,): super::Deps<Self>) -> Self {
+    fn from_config((conf, global_conf): Self::ServiceConfig, (_blaze,): super::Deps<Self>) -> Self {
         Self {
             provider: PhantomData,
             conf,
@@ -76,7 +76,7 @@ impl<T: BlazeProvider> Service for Transfair<T> {
                 .fhir_output
                 .clone()
                 .unwrap_or_else(|| FhirServerConfig {
-                    url: blaze.get_url(),
+                    url: Blaze::<T>::get_url(),
                     auth: "".to_string(),
                 }),
             trusted_ca_certs: global_conf.trusted_ca_certs(),

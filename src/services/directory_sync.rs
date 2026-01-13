@@ -50,9 +50,9 @@ impl<T: BlazeProvider> Service for DirectorySync<T> {
         format!("{}-directory-sync", T::balze_service_name())
     }
 
-    fn from_config(conf: Self::ServiceConfig, (blaze,): Deps<Self>) -> Self {
+    fn from_config(conf: Self::ServiceConfig, (_blaze,): Deps<Self>) -> Self {
         DirectorySync {
-            blaze_url: blaze.get_url(),
+            blaze_url: Blaze::<T>::get_url(),
             conf: conf.clone(),
             blaze_provider: PhantomData,
         }

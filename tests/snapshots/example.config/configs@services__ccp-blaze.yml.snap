@@ -20,6 +20,6 @@ services:
       - "traefik.http.services.ccp-blaze.loadbalancer.server.port=8080"
       - "traefik.http.routers.ccp-blaze.middlewares=ccp-blaze_strip,ccp-blaze"
       - "traefik.http.routers.ccp-blaze.tls=true"
-  
+
 volumes:
   ccp-blaze-data:

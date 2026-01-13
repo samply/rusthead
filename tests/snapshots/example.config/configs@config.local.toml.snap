@@ -11,3 +11,6 @@ pw = 'test'
 [basic_auth_users.ccp-blaze]
 hash = '<hash>'
 pw = 'test'
+[basic_auth_users.ccp-obds2fhir-auth]
+hash = '<hash>'
+pw = 'test'

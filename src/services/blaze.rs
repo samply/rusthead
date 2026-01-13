@@ -19,7 +19,7 @@ impl<T> Blaze<T>
 where
     Self: Service,
 {
-    pub fn get_url(&self) -> Url {
+    pub fn get_url() -> Url {
         Url::from_str(&format!("http://{}:8080", Self::service_name())).unwrap()
     }
 }

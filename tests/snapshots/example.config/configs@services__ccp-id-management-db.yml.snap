@@ -1,0 +1,18 @@
+---
+source: src/config.rs
+expression: file
+info: services/ccp-id-management-db.yml
+input_file: tests/configs/example.config.toml
+---
+services:
+  ccp-id-management-db:
+    image: docker.verbis.dkfz.de/cache/postgres:15.6-alpine
+    environment:
+      POSTGRES_USER: ccp-id-management
+      POSTGRES_DB: ccp-id-management
+      POSTGRES_PASSWORD: ${CCP_ID_MANAGEMENT_DB_PASSWORD}
+    volumes:
+      - "ccp-id-management-db:/var/lib/postgresql/data"
+
+volumes:
+  ccp-id-management-db:

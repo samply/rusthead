@@ -3,7 +3,7 @@ services:
   {{ name }}:
     image: docker.verbis.dkfz.de/cache/samply/blaze:latest
     environment:
-      BASE_URL: {{ get_url().to_string().trim_end_matches('/') }}
+      BASE_URL: {{ Self::get_url().to_string().trim_end_matches('/') }}
       ENFORCE_REFERENTIAL_INTEGRITY: "false"
     volumes:
       - "{{ name }}-data:/app/data"
@@ -16,6 +16,6 @@ services:
       - "traefik.http.routers.{{ name }}.middlewares={{ name }}_strip,{{ traefik_conf.middleware_and_user_name }}"
       - "traefik.http.routers.{{ name }}.tls=true"
     {%- endif %}
-  
+
 volumes:
   {{ name }}-data:

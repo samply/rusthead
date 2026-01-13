@@ -30,7 +30,7 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
     type Dependencies = (BeamProxy<T>, Blaze<B>);
     type ServiceConfig = String;
 
-    fn from_config(tag: Self::ServiceConfig, (beam_proxy, blaze): Deps<Self>) -> Self
+    fn from_config(tag: Self::ServiceConfig, (beam_proxy, _blaze): Deps<Self>) -> Self
     where
         Self: Sized,
     {
@@ -38,7 +38,7 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
         Focus {
             beam,
             beam_and_blaze: PhantomData,
-            blaze_url: blaze.get_url(),
+            blaze_url: Blaze::<B>::get_url(),
             tag: tag.clone(),
             endpoint_type: "blaze".into(),
             exporter: None,

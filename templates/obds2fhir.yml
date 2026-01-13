@@ -1,0 +1,18 @@
+
+services:
+  {{ Self::service_name() }}:
+    image: docker.verbis.dkfz.de/ccp/obds2fhir-rest:main
+    environment:
+      IDTYPE: {{ id_type }}
+      MAINZELLISTE_APIKEY: {{ mainzelliste_apikey }}
+      SALT: {{ salt }}
+      KEEP_INTERNAL_ID: {{ keep_internal_id }}
+      MAINZELLISTE_URL: {{ mainzelliste_url }}
+      STORE_PATH: {{ fhir_server_url }}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.{{ T::prefix() }}-obds2fhir-rest.rule=PathPrefix(`/{{ T::prefix() }}-obds2fhir-rest`) || PathPrefix(`/{{ T::prefix() }}-adt2fhir-rest`)"
+      - "traefik.http.middlewares.{{ T::prefix() }}-obds2fhir-rest_strip.stripprefix.prefixes=/{{ T::prefix() }}-obds2fhir-rest,/{{ T::prefix() }}-adt2fhir-rest"
+      - "traefik.http.services.{{ T::prefix() }}-obds2fhir-rest.loadbalancer.server.port=8080"
+      - "traefik.http.routers.{{ T::prefix() }}-obds2fhir-rest.tls=true"
+      - "traefik.http.routers.{{ T::prefix() }}-obds2fhir-rest.middlewares={{ T::prefix() }}-obds2fhir-rest_strip,{{ middleware_name }}"

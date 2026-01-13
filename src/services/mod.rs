@@ -10,6 +10,7 @@ use askama::Template;
 use crate::{Config, bridgehead::Bridgehead, modules::Module};
 
 mod beam_connect;
+pub mod obds2fhir;
 pub use beam_connect::BeamConnect;
 mod datashield;
 pub use datashield::DataShield;

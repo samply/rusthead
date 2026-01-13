@@ -1,0 +1,24 @@
+---
+source: src/config.rs
+expression: file
+info: services/ccp-obds2fhir-rest.yml
+input_file: tests/configs/example.config.toml
+---
+
+services:
+  ccp-obds2fhir-rest:
+    image: docker.verbis.dkfz.de/ccp/obds2fhir-rest:main
+    environment:
+      IDTYPE: BK_Dummy_L-ID
+      MAINZELLISTE_APIKEY: ${CCP_ID_MANAGEMENT_APIKEY}
+      SALT: ${CCP_OBDS2FHIR_REST_SALT}
+      KEEP_INTERNAL_ID: false
+      MAINZELLISTE_URL: http://ccp-id-management:8080/patientlist
+      STORE_PATH: http://ccp-blaze:8080/fhir
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ccp-obds2fhir-rest.rule=PathPrefix(`/ccp-obds2fhir-rest`) || PathPrefix(`/ccp-adt2fhir-rest`)"
+      - "traefik.http.middlewares.ccp-obds2fhir-rest_strip.stripprefix.prefixes=/ccp-obds2fhir-rest,/ccp-adt2fhir-rest"
+      - "traefik.http.services.ccp-obds2fhir-rest.loadbalancer.server.port=8080"
+      - "traefik.http.routers.ccp-obds2fhir-rest.tls=true"
+      - "traefik.http.routers.ccp-obds2fhir-rest.middlewares=ccp-obds2fhir-rest_strip,ccp-obds2fhir-auth"

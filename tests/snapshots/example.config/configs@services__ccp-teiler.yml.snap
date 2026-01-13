@@ -75,3 +75,4 @@ services:
       OPAL_CHECK_URL: "http://ccp-opal:8080/ccp-opal"
       ENABLE_MTBA: false
       ENABLE_DATASHIELD: true
+      IDMANAGER_UPLOAD_APIKEY: "test_upload_apikey" # Used for health checks

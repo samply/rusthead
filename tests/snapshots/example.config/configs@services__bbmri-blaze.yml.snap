@@ -20,6 +20,6 @@ services:
       - "traefik.http.services.bbmri-blaze.loadbalancer.server.port=8080"
       - "traefik.http.routers.bbmri-blaze.middlewares=bbmri-blaze_strip,bbmri-blaze"
       - "traefik.http.routers.bbmri-blaze.tls=true"
-  
+
 volumes:
   bbmri-blaze-data:
