@@ -1,0 +1,183 @@
+
+services:
+  dnpm-mysql:
+    image: mysql:9
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+    environment:
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_ROOT_PASSWORD: {{ mysql_root_password }}
+    volumes:
+      - dnpm-mysql:/var/lib/mysql
+
+  dnpm-authup:
+    image: authup/authup:latest
+    volumes:
+      - dnpm-authup:/usr/src/app/writable
+    depends_on:
+      dnpm-mysql:
+        condition: service_healthy
+    command: server/core start
+    environment:
+      - PUBLIC_URL=https://{{ host }}/auth/
+      - AUTHORIZE_REDIRECT_URL=https://{{ host }}
+      - ROBOT_ADMIN_ENABLED=true
+      - ROBOT_ADMIN_SECRET={{ authup_secret }}
+      - ROBOT_ADMIN_SECRET_RESET=true
+      - DB_TYPE=mysql
+      - DB_HOST=dnpm-mysql
+      - DB_USERNAME=root
+      - DB_PASSWORD={{ mysql_root_password }}
+      - DB_DATABASE=auth
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.middlewares.authup-strip.stripprefix.prefixes=/auth/"
+      - "traefik.http.routers.dnpm-auth.middlewares=authup-strip"
+      - "traefik.http.routers.dnpm-auth.rule=PathPrefix(`/auth`)"
+      - "traefik.http.services.dnpm-auth.loadbalancer.server.port=3000"
+      - "traefik.http.routers.dnpm-auth.tls=true"
+
+  dnpm-portal:
+    image: ghcr.io/dnpm-dip/portal:latest
+    environment:
+      - NUXT_API_URL=http://dnpm-backend:9000/
+      - NUXT_PUBLIC_API_URL=https://{{ host }}/api/
+      - NUXT_AUTHUP_URL=http://dnpm-authup:3000/
+      - NUXT_PUBLIC_AUTHUP_URL=https://{{ host }}/auth/
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dnpm-frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.services.dnpm-frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.dnpm-frontend.tls=true"
+
+  dnpm-backend:
+    image: ghcr.io/dnpm-dip/api-gateway:latest
+    environment:
+      - LOCAL_SITE={{ conf.zpm_site|upper }}:{{ site_id }}
+      - RD_RANDOM_DATA={{ conf.synth_num.unwrap_or(-1) }}
+      - MTB_RANDOM_DATA={{ conf.synth_num.unwrap_or(-1) }}
+      - HATEOAS_HOST=https://{{ host }}
+      - CONNECTOR_TYPE=broker
+      - AUTHUP_URL=robot://system:{{ authup_secret }}@http://dnpm-authup:3000
+      - TZ=Europe/Berlin
+    volumes:
+      - dnpm-backend-data:/dnpm_data
+    configs:
+      - source: dnpm-production.conf
+        target: /dnpm_config/production.conf
+      - source: dnpm-logback.xml
+        target: /dnpm_config/logback.xml
+      - source: dnpm-config.xml
+        target: /dnpm_config/config.xml
+    depends_on:
+      dnpm-authup:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.dnpm-backend.loadbalancer.server.port=9000"
+      # expose everything
+      - "traefik.http.routers.dnpm-backend.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.dnpm-backend.tls=true"
+      - "traefik.http.routers.dnpm-backend.service=dnpm-backend"
+      # except ETL
+      - "traefik.http.routers.dnpm-backend-etl.rule=PathRegexp(`^/api(/.*)?etl(/.*)?$`)"
+      - "traefik.http.routers.dnpm-backend-etl.tls=true"
+      - "traefik.http.routers.dnpm-backend-etl.service=dnpm-backend"
+      # this needs an ETL processor with support for basic auth
+      - "traefik.http.routers.dnpm-backend-etl.middlewares=auth"
+      # except peer-to-peer
+      - "traefik.http.routers.dnpm-backend-peer.rule=PathRegexp(`^/api(/.*)?/peer2peer(/.*)?$`)"
+      - "traefik.http.routers.dnpm-backend-peer.tls=true"
+      - "traefik.http.routers.dnpm-backend-peer.service=dnpm-backend"
+      - "traefik.http.routers.dnpm-backend-peer.middlewares=dnpm-backend-peer"
+      # this effectively denies all requests
+      # this is okay, because requests from peers don't go through Traefik
+      - "traefik.http.middlewares.dnpm-backend-peer.ipWhiteList.sourceRange=0.0.0.0/32"
+
+volumes:
+  dnpm-authup:
+  dnpm-mysql:
+  dnpm-backend-data:
+
+configs:
+  dnpm-production.conf:
+    content: |
+      include "application"
+
+      play {
+        http.secret.key = $${?APPLICATION_SECRET}
+        http.parser.maxMemoryBuffer=2MB
+        http.context="/api"
+
+        server {
+          http {
+            port = $${?http.port}
+          }
+        }
+
+        filters {
+
+          enabled += "play.filters.cors.CORSFilter"
+
+          disabled += "play.filters.hosts.AllowedHostsFilter"
+          disabled += "play.filters.csrf.CSRFFilter"
+
+          cors {
+            pathPrefixes = ["/"]
+            allowedOrigins = null
+            allowedHttpMethods = null
+            allowedHttpHeaders = null
+            preflightMaxAge = 3 days
+          }
+        }
+      }
+
+  dnpm-logback.xml:
+    content: |
+      <?xml version="1.0" encoding="utf-8"?>
+
+      <configuration scan="true">
+
+        <property name="LOG_DIR"  value="/dnpm_data/logs"/>
+        <property name="LOG_FILE" value="dnpm-dip-backend"/>
+
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+          <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+          </encoder>
+        </appender>
+
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+          <file>$${LOG_DIR}/$${LOG_FILE}.log</file>
+
+          <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>$${LOG_DIR}/$${LOG_FILE}-%d{yyyy-MM-dd}.log</fileNamePattern>
+
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+          </rollingPolicy>
+
+          <encoder>
+            <pattern>%d [%thread] %-5level %logger{36} - %msg%n</pattern>
+          </encoder>
+        </appender>
+
+        <root level="INFO">
+          <appender-ref ref="STDOUT"/>
+          <appender-ref ref="FILE"/>
+        </root>
+
+      </configuration>
+
+  dnpm-config.xml:
+    content: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <Config>
+        <Connector>
+          <Broker baseURL="http://ccp-beam-connect:8062"/>
+          <UpdatePeriod minutes="30"/>
+        </Connector>
+      </Config>

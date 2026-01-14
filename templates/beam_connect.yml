@@ -8,6 +8,7 @@ services:
       PROXY_APIKEY: {{ beam.secret }}
       DISCOVERY_URL: "./central-targets"
       LOCAL_TARGETS_FILE: "./local-targets"
+      NO_PROXY: beam.url.host_str().unwrap(),{{ no_proxy|join(",") }}
       NO_AUTH: "true"
     volumes:
       - {{ trusted_ca_certs.display() }}:/trusted_ca_certs/:ro

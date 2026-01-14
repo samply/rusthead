@@ -19,6 +19,7 @@ where
     trusted_ca_certs: PathBuf,
     local_targets: Vec<LocalTarget>,
     central_targets: Vec<CentralTarget>,
+    pub no_proxy: Vec<String>,
     beam_provider: PhantomData<T>,
 }
 
@@ -34,6 +35,7 @@ impl<T: BrokerProvider> Service for BeamConnect<T> {
             trusted_ca_certs: conf.trusted_ca_certs(),
             local_targets: vec![],
             central_targets: vec![],
+            no_proxy: vec![],
             beam_provider: PhantomData,
         }
     }
@@ -43,13 +45,14 @@ impl<T: BrokerProvider> Service for BeamConnect<T> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalTarget {
     /// The hostname used by the service talking to this one.
     pub external: String,
     /// The hostname that should be used internally to connect.
     pub internal: String,
     /// List of app or proxy IDs that are allowed to connect to this target.
+    #[serde(default)]
     pub allowed: Vec<String>,
     /// Force the local connection to use HTTPS.
     #[serde(default, rename = "forceHttps")]
@@ -96,7 +99,6 @@ where
         self.local_targets.push(target);
     }
 
-    #[expect(unused)]
     pub fn add_central_target(&mut self, target: CentralTarget) {
         self.central_targets.push(target);
     }

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
 use crate::{
-    modules::{BbmriConfig, CcpConfig},
+    modules::{BbmriConfig, CcpConfig, DnpmConfig},
     services::{BasicAuthUser, Service},
 };
 
@@ -23,6 +23,7 @@ pub struct Config {
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
+    pub dnpm: Option<DnpmConfig>,
     /// Path to the folder in which this config.toml was located
     #[serde(skip)]
     pub path: PathBuf,

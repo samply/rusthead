@@ -24,3 +24,6 @@ gbn = true
 [bbmri.directory_sync]
 username = "test"
 password = "test"
+
+[dnpm.node]
+zpm_site = "dummy"
