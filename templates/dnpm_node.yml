@@ -87,7 +87,7 @@ services:
       - "traefik.http.routers.dnpm-backend-etl.tls=true"
       - "traefik.http.routers.dnpm-backend-etl.service=dnpm-backend"
       # this needs an ETL processor with support for basic auth
-      - "traefik.http.routers.dnpm-backend-etl.middlewares=auth"
+      - "traefik.http.routers.dnpm-backend-etl.middlewares=dnpm-etl"
       # except peer-to-peer
       - "traefik.http.routers.dnpm-backend-peer.rule=PathRegexp(`^/api(/.*)?/peer2peer(/.*)?$`)"
       - "traefik.http.routers.dnpm-backend-peer.tls=true"

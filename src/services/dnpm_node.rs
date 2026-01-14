@@ -1,7 +1,10 @@
 use askama::Template;
 use serde::Deserialize;
 
-use crate::{config::Config, services::Service};
+use crate::{
+    config::Config,
+    services::{Service, Traefik},
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DnpmNodeConf {
@@ -20,11 +23,15 @@ pub struct DnpmNode {
 }
 
 impl Service for DnpmNode {
-    type Dependencies = ();
+    type Dependencies = (Traefik,);
 
     type ServiceConfig = (DnpmNodeConf, &'static Config);
 
-    fn from_config((conf, global_conf): Self::ServiceConfig, (): super::Deps<Self>) -> Self {
+    fn from_config(
+        (conf, global_conf): Self::ServiceConfig,
+        (traefik,): super::Deps<Self>,
+    ) -> Self {
+        traefik.add_basic_auth_user("dnpm-etl".to_string());
         let mut local_conf = global_conf.local_conf.borrow_mut();
         Self {
             conf,

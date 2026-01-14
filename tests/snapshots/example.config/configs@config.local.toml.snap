@@ -14,3 +14,6 @@ pw = 'test'
 [basic_auth_users.ccp-obds2fhir-auth]
 hash = '<hash>'
 pw = 'test'
+[basic_auth_users.dnpm-etl]
+hash = '<hash>'
+pw = 'test'
