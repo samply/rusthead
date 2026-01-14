@@ -119,7 +119,9 @@ impl LocalConf {
             name.to_uppercase()
         )
         .replace("-", "_");
-        let salt = name.chars().fold(0, |a, b| a as u64 ^ b as u64);
+        let salt = name
+            .chars()
+            .fold(0_u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64));
         let mut rng = StdRng::seed_from_u64(self.seed as u64 ^ salt);
         let secret = crate::utils::secret_from_rng::<N>(&mut rng);
         let var = format!("${{{name}}}");
