@@ -29,6 +29,8 @@ pub enum DiffTrackerResult<'a> {
 
 impl<'a> DiffTracker<'a> {
     pub fn start(conf: &'a Config) -> anyhow::Result<DiffTrackerResult<'a>> {
+        // Required for git to create the files in the shared repository with group write permissions
+        unsafe { libc::umask(0o0002) };
         if !is_git_repo(conf) {
             println!("Directory is not a git repository yet skipping diff tracking");
             return Ok(DiffTrackerResult::NotAGitRepo);

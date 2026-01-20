@@ -17,11 +17,10 @@ main() {
             useradd -M -g docker -N bridgehead &>/dev/null || echo "Using existing user bridgehead."
             chown -R bridgehead:docker .
             chmod -R g+sw .
-            sudo -u bridgehead git init -b main
+            sudo -u bridgehead git init -b main --shared=group
             git config --global --add safe.directory {{ config_dir }}
             git config --local user.email "bridgehead@samply.de"
             git config --local user.name "Bridgehead"
-            git config --local core.sharedRepository group
             {%- if let Some(proxy_url) = conf.https_proxy_url %}
             git config --local http.proxy {{ proxy_url }}
             git config --local https.proxy {{ proxy_url }}

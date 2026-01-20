@@ -41,3 +41,4 @@ docker run --rm \
     -e BRIDGEHEAD_CONFIG_PATH=$config_dir \
     samply/rusthead:${TAG:-latest} update
 sudo $config_dir/bridgehead install
+git config --global --add safe.directory $config_dir
