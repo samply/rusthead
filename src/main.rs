@@ -5,7 +5,7 @@ use clap::Parser;
 use config::Config;
 use services::ServiceMap;
 
-use crate::git::DiffTrackerResult;
+use crate::{bridgehead::Bridgehead, git::DiffTrackerResult};
 
 mod bridgehead;
 mod config;
@@ -14,24 +14,39 @@ mod modules;
 mod services;
 mod utils;
 
+#[derive(Debug, clap::Subcommand)]
+enum BootstrapHelper {
+    Bridgehead {
+        #[clap(short, long, env = "BRIDGEHEAD_CONFIG_PATH")]
+        config: PathBuf,
+    },
+}
+
 #[derive(Debug, clap::Parser)]
 enum Args {
-    Bootstrap,
+    Bootstrap {
+        #[clap(subcommand)]
+        helper: Option<BootstrapHelper>,
+    },
     Update {
-        #[clap(
-            short,
-            long,
-            env = "BRIDGEHEAD_CONFIG_PATH",
-            default_value = "/etc/bridgehead"
-        )]
+        #[clap(short, long, env = "BRIDGEHEAD_CONFIG_PATH")]
         config: PathBuf,
     },
 }
 
 fn main() -> anyhow::Result<ExitCode> {
     let conf_path = match Args::parse() {
-        Args::Bootstrap => {
+        Args::Bootstrap { helper: None } => {
             println!("{}", include_str!("../static/bootstrap.sh"));
+            return Ok(ExitCode::SUCCESS);
+        }
+        Args::Bootstrap {
+            helper: Some(BootstrapHelper::Bridgehead { config }),
+        } => {
+            let conf = Config::load(&config)
+                .with_context(|| format!("Failed to load config from {config:?}"))?;
+            let conf: &'static Config = Box::leak(Box::new(conf));
+            Bridgehead::new(&conf).write()?;
             return Ok(ExitCode::SUCCESS);
         }
         Args::Update { config } => config,

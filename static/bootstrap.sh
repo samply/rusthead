@@ -21,7 +21,6 @@ if [ ! -f "${DEFAULT_CONFIG_DIR}/config.toml" ]; then
     mkdir -p "$config_dir"
     cat > "${config_dir}/config.toml" << EOF
 site_id = "$site_id"
-
 hostname = "$hostname"
 EOF
 
@@ -38,7 +37,6 @@ fi
 
 docker run --rm \
     -v $config_dir:$config_dir \
-    -e BRIDGEHEAD_CONFIG_PATH=$config_dir \
-    samply/rusthead:${TAG:-latest} update
+    samply/rusthead:${TAG:-latest} bootstrap bridgehead --config $config_dir
 sudo $config_dir/bridgehead install
 git config --global --add safe.directory $config_dir
