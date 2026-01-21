@@ -11,8 +11,8 @@ services:
       STORE_PATH: {{ fhir_server_url }}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.{{ T::prefix() }}-obds2fhir-rest.rule=PathPrefix(`/{{ T::prefix() }}-obds2fhir-rest`) || PathPrefix(`/{{ T::prefix() }}-adt2fhir-rest`)"
-      - "traefik.http.middlewares.{{ T::prefix() }}-obds2fhir-rest_strip.stripprefix.prefixes=/{{ T::prefix() }}-obds2fhir-rest,/{{ T::prefix() }}-adt2fhir-rest"
-      - "traefik.http.services.{{ T::prefix() }}-obds2fhir-rest.loadbalancer.server.port=8080"
-      - "traefik.http.routers.{{ T::prefix() }}-obds2fhir-rest.tls=true"
-      - "traefik.http.routers.{{ T::prefix() }}-obds2fhir-rest.middlewares={{ T::prefix() }}-obds2fhir-rest_strip,{{ middleware_name }}"
+      - "traefik.http.routers.{{ prefix }}-obds2fhir-rest.rule=PathPrefix(`/{{ prefix }}-obds2fhir-rest`) || PathPrefix(`/{{ prefix }}-adt2fhir-rest`)"
+      - "traefik.http.middlewares.{{ prefix }}-obds2fhir-rest_strip.stripprefix.prefixes=/{{ prefix }}-obds2fhir-rest,/{{ prefix }}-adt2fhir-rest"
+      - "traefik.http.services.{{ prefix }}-obds2fhir-rest.loadbalancer.server.port=8080"
+      - "traefik.http.routers.{{ prefix }}-obds2fhir-rest.tls=true"
+      - "traefik.http.routers.{{ prefix }}-obds2fhir-rest.middlewares={{ prefix }}-obds2fhir-rest_strip,{{ middleware_name }}"

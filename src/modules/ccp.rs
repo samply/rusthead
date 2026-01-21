@@ -39,11 +39,12 @@ impl Module for CcpDefault {
         };
         service_map.install_with_config::<Focus<Self, Blaze<Self>>>("main-dktk".into());
         if let Some(idm_conf) = &ccp_conf.id_manager {
-            let ml = service_map.install_with_config::<IdManagement<Self>>((idm_conf, conf));
+            service_map.install_with_config::<IdManagement<Self>>((idm_conf, conf));
             if let Some(obds_conf) = &ccp_conf.obds2fhir {
-                let blaze_url = Blaze::<Self>::get_url().join("fhir").unwrap();
-                let obds_conf = obds_conf.defaulted_with(ml, blaze_url);
-                service_map.install_with_config::<Obds2Fhir<Self>>((obds_conf, conf));
+                service_map.install_with_config::<Obds2Fhir<IdManagement<Self>>>((
+                    obds_conf.clone(),
+                    conf,
+                ));
             }
         } else if ccp_conf.obds2fhir.is_some() {
             panic!("obds2fhir rest requires id mamanger setup")
