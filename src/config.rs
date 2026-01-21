@@ -173,8 +173,8 @@ mod tests {
             modules::MODULES
                 .iter()
                 .for_each(|&m| services.install_module(m));
-            let has_beam_networks = BEAM_NETWORKS.with_borrow(|nets| !nets.is_empty());
             services.write_all().unwrap();
+            let has_beam_networks = !BEAM_NETWORKS.take().is_empty();
             let has_services = services.len() > 0;
             let tmp_dir_path = temp_dir.path().display().to_string();
             let filters = [(tmp_dir_path.as_str(), "[TMP_DIR]")];
@@ -224,7 +224,7 @@ mod tests {
             .unwrap();
             let out = Command::new("./bridgehead")
                 .current_dir(temp_dir.path())
-                .stdout(Stdio::null())
+                .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .arg("compose")
                 .arg("config")
@@ -234,8 +234,9 @@ mod tests {
                 .unwrap();
             assert!(
                 out.status.success(),
-                "Generated invalid compose files: {}",
-                String::from_utf8_lossy(&out.stderr)
+                "Generated invalid compose files\n stderr: {}\n stdout: {}",
+                String::from_utf8_lossy(&out.stderr),
+                String::from_utf8_lossy(&out.stdout)
             );
         });
     }

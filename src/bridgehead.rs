@@ -17,7 +17,7 @@ pub struct Bridgehead {
 impl Bridgehead {
     pub fn new(conf: &'static Config) -> Self {
         Self {
-            beam_networks: BEAM_NETWORKS.take(),
+            beam_networks: BEAM_NETWORKS.with_borrow(|nets| nets.clone()),
             conf,
         }
     }

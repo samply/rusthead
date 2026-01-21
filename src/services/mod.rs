@@ -55,6 +55,8 @@ pub trait ServiceTuple {
     type DepRefs<'t>;
 
     fn get_or_create<'services>(services: &'services mut ServiceMap) -> Self::DepRefs<'services>;
+
+    fn register_deps(parent: TypeId, deps: &mut solvent::DepGraph<TypeId>);
 }
 
 macro_rules! service_tuple_option {
@@ -81,6 +83,16 @@ macro_rules! service_tuple_option {
                     // Optional services may be absent
                     $($opt_ts.map(|s| (s.as_mut() as &mut dyn Any).downcast_mut::<$opt_ts>().unwrap()),)*
                 )
+            }
+
+            fn register_deps(parent: TypeId, deps: &mut solvent::DepGraph<TypeId>) {
+                deps.register_dependencies(parent, vec![$(TypeId::of::<$ts>(),)* $(TypeId::of::<$opt_ts>(),)*]);
+                $(
+                    $ts::Dependencies::register_deps(TypeId::of::<$ts>(), deps);
+                )*
+                $(
+                    $opt_ts::Dependencies::register_deps(TypeId::of::<$opt_ts>(), deps);
+                )*
             }
         }
     };
@@ -121,6 +133,13 @@ macro_rules! service_tuple {
                 ]);
                 // All services are guaranteed to be created at this point
                 ($(($ts.unwrap().as_mut() as &mut dyn Any).downcast_mut::<$ts>().unwrap(),)*)
+            }
+
+            fn register_deps(parent: TypeId, deps: &mut solvent::DepGraph<TypeId>) {
+                deps.register_dependencies(parent, vec![$(TypeId::of::<$ts>(),)*]);
+                $(
+                    $ts::Dependencies::register_deps(TypeId::of::<$ts>(), deps);
+                )*
             }
         }
 
@@ -179,6 +198,8 @@ impl<T: Template + Service> ToCompose for T {
 }
 
 pub struct ServiceMap {
+    deps: solvent::DepGraph<TypeId>,
+    constructors: HashMap<TypeId, Box<dyn FnOnce(&mut Self) -> Box<dyn ToCompose>>>,
     map: HashMap<TypeId, Box<dyn ToCompose>>,
     config: &'static Config,
 }
@@ -190,8 +211,14 @@ impl std::fmt::Debug for ServiceMap {
 }
 
 impl ServiceMap {
+    const ROOT_NODE: TypeId = TypeId::of::<Bridgehead>();
+
     pub fn new(config: &'static Config) -> Self {
+        let mut deps = solvent::DepGraph::new();
+        deps.register_node(Self::ROOT_NODE);
         Self {
+            deps,
+            constructors: HashMap::new(),
             map: HashMap::new(),
             config,
         }
@@ -202,7 +229,8 @@ impl ServiceMap {
         self.map.len()
     }
 
-    pub fn write_all(&self) -> anyhow::Result<()> {
+    pub fn write_all(&mut self) -> anyhow::Result<()> {
+        self.materialize();
         self.write_composables()
             .context("Failed to write services")?;
         Bridgehead::new(self.config).write()?;
@@ -261,29 +289,29 @@ impl ServiceMap {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn install_with_config<T: Service>(&mut self, conf: T::ServiceConfig) -> &mut T {
-        // Workaround for problem case #3
-        // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
-        if self.contains::<T>() {
-            return self.get_mut().unwrap();
-        }
-        let s = T::from_config(conf, T::Dependencies::get_or_create(self));
-        self.insert(s)
+    pub fn install_with_config<T: Service>(&mut self, conf: T::ServiceConfig) {
+        self.deps
+            .register_dependency(Self::ROOT_NODE, TypeId::of::<T>());
+        T::Dependencies::register_deps(TypeId::of::<T>(), &mut self.deps);
+        self.constructors.insert(
+            TypeId::of::<T>(),
+            Box::new(|s| Box::new(T::from_config(conf, T::Dependencies::get_or_create(s)))),
+        );
+    }
+
+    pub fn install_default<T: DefaultService>(&mut self) {
+        self.deps
+            .register_dependency(Self::ROOT_NODE, TypeId::of::<T>());
+        T::Dependencies::register_deps(TypeId::of::<T>(), &mut self.deps);
+        self.constructors.insert(
+            TypeId::of::<T>(),
+            Box::new(|s| Box::new(T::from_default_config(s))),
+        );
     }
 
     fn insert<T: Service>(&mut self, s: T) -> &mut T {
         self.map.insert(TypeId::of::<T>(), Box::new(s));
         self.get_mut().unwrap()
-    }
-
-    pub fn install_default<T: DefaultService>(&mut self) -> &mut T {
-        // Workaround for problem case #3
-        // https://smallcultfollowing.com/babysteps/blog/2016/04/27/non-lexical-lifetimes-introduction/
-        if self.contains::<T>() {
-            return self.get_mut().unwrap();
-        }
-        let s = T::from_default_config(self);
-        self.insert(s)
     }
 
     pub fn install_module<M: Module>(&mut self, m: M) {
@@ -303,5 +331,21 @@ impl ServiceMap {
             )?;
         }
         Ok(())
+    }
+
+    fn materialize(&mut self) {
+        let deps = std::mem::take(&mut self.deps);
+        for dep in deps.dependencies_of(&Self::ROOT_NODE).unwrap() {
+            let dep = dep.expect("No cycle");
+            if self.map.contains_key(dep) {
+                continue;
+            }
+            let Some(c) = self.constructors.remove(dep) else {
+                // We assume that this would be an optional dependency in this case
+                continue;
+            };
+            let service = c(self);
+            self.map.insert(dep.clone(), service);
+        }
     }
 }
