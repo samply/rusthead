@@ -2,6 +2,7 @@ use std::{
     any::{Any, TypeId},
     collections::HashMap,
     fs,
+    marker::PhantomData,
 };
 
 use anyhow::Context;
@@ -200,8 +201,24 @@ impl<T: Template + Service> ToCompose for T {
 pub struct ServiceMap {
     deps: solvent::DepGraph<TypeId>,
     constructors: HashMap<TypeId, Box<dyn FnOnce(&mut Self) -> Box<dyn ToCompose>>>,
+    post_install: HashMap<TypeId, Vec<Box<dyn FnOnce(&mut dyn ToCompose)>>>,
     map: HashMap<TypeId, Box<dyn ToCompose>>,
     config: &'static Config,
+}
+
+pub struct PostInstallBuilder<'a, T>(&'a mut ServiceMap, PhantomData<T>);
+
+impl<T: Service> PostInstallBuilder<'_, T> {
+    pub fn post_install(self, post_install: impl FnOnce(&mut T) + 'static) -> Self {
+        self.0
+            .post_install
+            .entry(TypeId::of::<T>())
+            .or_default()
+            .push(Box::new(move |service| {
+                post_install((service as &mut dyn Any).downcast_mut::<T>().unwrap())
+            }));
+        self
+    }
 }
 
 impl std::fmt::Debug for ServiceMap {
@@ -219,6 +236,7 @@ impl ServiceMap {
         Self {
             deps,
             constructors: HashMap::new(),
+            post_install: HashMap::new(),
             map: HashMap::new(),
             config,
         }
@@ -279,17 +297,14 @@ impl ServiceMap {
         Ok(())
     }
 
-    pub fn get_mut<T: Any>(&mut self) -> Option<&mut T> {
-        self.map
-            .get_mut(&TypeId::of::<T>())
-            .and_then(|v| (v.as_mut() as &mut dyn Any).downcast_mut::<T>())
-    }
-
     pub fn contains<T: ToCompose + Any>(&self) -> bool {
         self.map.contains_key(&TypeId::of::<T>())
     }
 
-    pub fn install_with_config<T: Service>(&mut self, conf: T::ServiceConfig) {
+    pub fn install_with_config<T: Service>(
+        &mut self,
+        conf: T::ServiceConfig,
+    ) -> PostInstallBuilder<'_, T> {
         self.deps
             .register_dependency(Self::ROOT_NODE, TypeId::of::<T>());
         T::Dependencies::register_deps(TypeId::of::<T>(), &mut self.deps);
@@ -297,9 +312,10 @@ impl ServiceMap {
             TypeId::of::<T>(),
             Box::new(|s| Box::new(T::from_config(conf, T::Dependencies::get_or_create(s)))),
         );
+        PostInstallBuilder(self, PhantomData)
     }
 
-    pub fn install_default<T: DefaultService>(&mut self) {
+    pub fn install_default<T: DefaultService>(&mut self) -> PostInstallBuilder<'_, T> {
         self.deps
             .register_dependency(Self::ROOT_NODE, TypeId::of::<T>());
         T::Dependencies::register_deps(TypeId::of::<T>(), &mut self.deps);
@@ -307,11 +323,11 @@ impl ServiceMap {
             TypeId::of::<T>(),
             Box::new(|s| Box::new(T::from_default_config(s))),
         );
+        PostInstallBuilder(self, PhantomData)
     }
 
-    fn insert<T: Service>(&mut self, s: T) -> &mut T {
+    fn insert<T: Service>(&mut self, s: T) {
         self.map.insert(TypeId::of::<T>(), Box::new(s));
-        self.get_mut().unwrap()
     }
 
     pub fn install_module<M: Module>(&mut self, m: M) {
@@ -344,7 +360,12 @@ impl ServiceMap {
                 // We assume that this would be an optional dependency in this case
                 continue;
             };
-            let service = c(self);
+            let mut service = c(self);
+            if let Some(post_install) = self.post_install.remove(dep) {
+                for post in post_install {
+                    post(service.as_mut());
+                }
+            }
             self.map.insert(dep.clone(), service);
         }
     }

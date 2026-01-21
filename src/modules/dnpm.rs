@@ -27,22 +27,29 @@ impl Module for Dnpm {
         let Some(conf) = &global_conf.dnpm else {
             return;
         };
-        let bc = service_map.install_default::<BeamConnect<CcpDefault>>();
-        let mut default_allowed_remotes = vec![];
-        for (vhost, beam_connect) in DNPM_SITES {
-            bc.add_central_target(CentralTarget {
-                virtualhost: vhost.to_string(),
-                beam_connect: beam_connect.to_string(),
+        let bc = service_map
+            .install_default::<BeamConnect<CcpDefault>>()
+            .post_install(|bc| {
+                for (vhost, beam_connect) in DNPM_SITES {
+                    bc.add_central_target(CentralTarget {
+                        virtualhost: vhost.to_string(),
+                        beam_connect: beam_connect.to_string(),
+                    });
+                }
             });
-            default_allowed_remotes.push(beam_connect.to_string());
-        }
+        let default_allowed_remotes = DNPM_SITES
+            .into_iter()
+            .map(|(_, bc)| bc.to_string())
+            .collect();
         match conf {
             DnpmConfig::Node(conf) => {
-                bc.add_local_target(LocalTarget::new(
-                    format!("{}.dnpm.de", conf.zpm_site.to_lowercase()),
-                    "dnpm-backend:9000".to_string(),
-                    default_allowed_remotes,
-                ));
+                bc.post_install(|bc| {
+                    bc.add_local_target(LocalTarget::new(
+                        format!("{}.dnpm.de", conf.zpm_site.to_lowercase()),
+                        "dnpm-backend:9000".to_string(),
+                        default_allowed_remotes,
+                    ));
+                });
                 service_map.install_with_config::<DnpmNode>((conf.clone(), global_conf));
             }
             DnpmConfig::Local { target, no_proxy } => {
@@ -50,10 +57,12 @@ impl Module for Dnpm {
                 if target.allowed.is_empty() {
                     target.allowed = default_allowed_remotes;
                 }
-                bc.add_local_target(target);
-                if let Some(no_proxy) = no_proxy {
-                    bc.no_proxy.push(no_proxy.clone());
-                }
+                bc.post_install(|bc| {
+                    bc.add_local_target(target);
+                    if let Some(no_proxy) = no_proxy.clone() {
+                        bc.no_proxy.push(no_proxy);
+                    }
+                });
             }
         }
     }

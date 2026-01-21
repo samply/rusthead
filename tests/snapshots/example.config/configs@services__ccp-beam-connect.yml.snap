@@ -27,15 +27,6 @@ configs:
     content: |
       [
         {
-          "external": "dummy:443",
-          "internal": "ccp-opal:8443",
-          "allowed": [
-            "central-ds-orchestrator.broker.ccp-it.dktk.dkfz.de"
-          ],
-          "forceHttps": false,
-          "resetHost": false
-        },
-        {
           "external": "dummy.dnpm.de",
           "internal": "dnpm-backend:9000",
           "allowed": [
@@ -62,6 +53,15 @@ configs:
             "dnpm-connect.wuerzburg-dnpm.broker.ccp-it.dktk.dkfz.de",
             "dnpm-connect.uksh-dnpm.broker.ccp-it.dktk.dkfz.de",
             "dnpm-connect.tobias-develop.broker.ccp-it.dktk.dkfz.de"
+          ],
+          "forceHttps": false,
+          "resetHost": false
+        },
+        {
+          "external": "dummy:443",
+          "internal": "ccp-opal:8443",
+          "allowed": [
+            "central-ds-orchestrator.broker.ccp-it.dktk.dkfz.de"
           ],
           "forceHttps": false,
           "resetHost": false
