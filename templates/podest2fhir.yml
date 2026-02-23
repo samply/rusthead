@@ -1,0 +1,12 @@
+
+services:
+  {{ Self::service_name() }}:
+    image: ghcr.io/samply/podest2fhir:main
+    environment:
+      FHIR_BASE_URL: {{ fhir_base_url }}
+      DB_HOST: {{ db_host }}
+      DB_PORT: {{ db_port }}
+      DB_NAME: {{ db_name }}
+      DB_USER: {{ db_user }}
+      DB_PASSWORD: {{ db_password }}
+    command: --daemon --profile {{ profile }}
