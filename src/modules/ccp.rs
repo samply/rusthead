@@ -64,7 +64,7 @@ impl Module for CcpDefault {
             service_map.install_with_config::<Teiler<Self>>((teiler_conf, conf));
         }
         if let Some(podest_conf) = &ccp_conf.podest2fhir {
-            service_map.install_with_config::<Podest2Fhir<Self>>((podest_conf.clone(), "dktk", conf));
+            service_map.install_with_config::<Podest2Fhir<Self>>((podest_conf.clone(), "dktk"));
         }
     }
 }

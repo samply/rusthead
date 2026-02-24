@@ -4,10 +4,7 @@ use askama::Template;
 use serde::Deserialize;
 use url::Url;
 
-use crate::{
-    config::Config,
-    services::{Blaze, BlazeProvider, BrokerProvider, Service},
-};
+use crate::services::{Blaze, BlazeProvider, BrokerProvider, Focus, Service};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Podest2FhirConfig {
@@ -17,7 +14,6 @@ pub struct Podest2FhirConfig {
     pub db_port: u16,
     pub db_name: String,
     pub db_user: String,
-    pub db_password: String,
 }
 
 #[derive(Debug, Template)]
@@ -31,7 +27,6 @@ where
     db_port: u16,
     db_name: String,
     db_user: String,
-    db_password: String,
     profile: &'static str,
     kind: PhantomData<T>,
 }
@@ -40,13 +35,13 @@ impl<T: BrokerProvider + BlazeProvider> Service for Podest2Fhir<T>
 where
     Podest2Fhir<T>: 'static,
 {
-    type Dependencies = (Blaze<T>,);
+    type Dependencies = (Blaze<T>, Focus<T, Blaze<T>>);
 
-    type ServiceConfig = (Podest2FhirConfig, &'static str, &'static Config);
+    type ServiceConfig = (Podest2FhirConfig, &'static str);
 
     fn from_config(
-        (conf, profile, _global): Self::ServiceConfig,
-        (_blaze,): super::Deps<Self>,
+        (conf, profile): Self::ServiceConfig,
+        (_blaze, _focus): super::Deps<Self>,
     ) -> Self {
         Self {
             fhir_base_url: conf
@@ -56,7 +51,6 @@ where
             db_port: conf.db_port,
             db_name: conf.db_name,
             db_user: conf.db_user,
-            db_password: conf.db_password,
             profile,
             kind: PhantomData,
         }
