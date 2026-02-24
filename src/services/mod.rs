@@ -289,10 +289,22 @@ impl ServiceMap {
         pull_cmd
             .args(["--env-file", ".env", "pull", "--quiet"])
             .current_dir(&self.config.path);
-        let lockfile = cmd.output()?.stdout;
-        fs::write(self.config.path.join("docker-image.lock.yml"), lockfile)?;
+        let output = cmd.output()?;
+        if !output.status.success() {
+            anyhow::bail!(
+                "Failed to generate lockfile: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        fs::write(
+            self.config.path.join("docker-image.lock.yml"),
+            output.stdout,
+        )?;
         if !pull_cmd.status()?.success() {
-            anyhow::bail!("Failed to pull images.");
+            anyhow::bail!(
+                "Failed to pull images: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
         Ok(())
     }
