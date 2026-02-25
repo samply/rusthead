@@ -17,8 +17,9 @@ pub struct Config {
     pub hostname: Host,
     #[serde(default)]
     pub environment: Environment,
-    #[serde(default = "latest")]
-    pub version_tag: String,
+    /// Rusthead Docker image to use (defaults to "samply/rusthead:latest")
+    #[serde(default = "default_image")]
+    pub image: String,
     pub git_sync: Option<bool>,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
@@ -32,8 +33,8 @@ pub struct Config {
     pub local_conf: RefCell<LocalConf>,
 }
 
-fn latest() -> String {
-    "latest".to_string()
+fn default_image() -> String {
+    "samply/rusthead:latest".to_string()
 }
 
 #[derive(Debug, Deserialize, Default)]

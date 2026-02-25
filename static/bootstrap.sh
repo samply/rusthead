@@ -27,7 +27,7 @@ EOF
     read -p "Proxy [${HTTPS_PROXY:-None}]: " proxy
     proxy="${proxy:-$HTTPS_PROXY}"
     [ -n "$proxy" ] && echo "proxy = \"$proxy\"" >> "${config_dir}/config.toml"
-    [ -n "$TAG" ] && echo "version_tag = \"$TAG\"" >> "${config_dir}/config.toml"
+    [ -n "$IMAGE" ] && echo "image = \"$IMAGE\"" >> "${config_dir}/config.toml"
 
     echo "Configuration file created at ${config_dir}/config.toml"
 else
@@ -37,6 +37,6 @@ fi
 
 docker run --rm \
     -v $config_dir:$config_dir \
-    samply/rusthead:${TAG:-latest} bootstrap bridgehead --config $config_dir
+    ${IMAGE:-samply/rusthead:latest} bootstrap bridgehead --config $config_dir
 sudo $config_dir/bridgehead install
 git config --global --add safe.directory $config_dir
