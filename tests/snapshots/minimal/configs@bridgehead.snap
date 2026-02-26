@@ -53,9 +53,13 @@ main() {
         update)
             docker image prune -f
             docker pull samply/rusthead:latest &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
+            docker_config=~/.docker/config.json
+            docker_config_mount=""
+            [ -f "$docker_config" ] && docker_config_mount="-v $docker_config:/root/.docker/config.json:ro"
             docker run --rm \
                 -v [TMP_DIR]:[TMP_DIR] \
                 -v /var/run/docker.sock:/var/run/docker.sock \
+                $docker_config_mount \
                 -e BRIDGEHEAD_CONFIG_PATH=[TMP_DIR] \
                 -u "$(id -u bridgehead):$(id -g bridgehead)" \
                 samply/rusthead:latest update
