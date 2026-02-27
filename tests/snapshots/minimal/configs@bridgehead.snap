@@ -53,6 +53,7 @@ main() {
         update)
             docker image prune -f
             docker pull samply/rusthead:latest &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
+            # Mount the docker config if it exists to allow pulling from private registries if needed
             docker_config=~/.docker/config.json
             docker_config_mount=""
             [ -f "$docker_config" ] && docker_config_mount="-v $docker_config:/root/.docker/config.json:ro"
