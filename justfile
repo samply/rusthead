@@ -2,7 +2,7 @@ set shell := ["bash", "-cue"]
 
 ARCH := `docker version --format '{{.Server.Arch}}'`
 CONFIG_PATH := env("BRIDGEHEAD_CONFIG_PATH", "./bridgehead")
-export TAG := env("TAG", "localbuild")
+export IMAGE := env("IMAGE", "samply/rusthead:localbuild")
 
 run: build ensure_bootstrap
   sudo {{ CONFIG_PATH }}/bridgehead install
@@ -16,7 +16,7 @@ down_bg:
 
 [private]
 ensure_bootstrap:
-  if ! {{ path_exists(CONFIG_PATH / "bridgehead") }}; then TAG=$TAG just bootstrap; fi
+  if ! {{ path_exists(CONFIG_PATH / "bridgehead") }}; then IMAGE=$IMAGE just bootstrap; fi
 
 down:
   {{ CONFIG_PATH }}/bridgehead compose down
@@ -28,8 +28,8 @@ build:
   cargo build
   mkdir -p artifacts/binaries-{{ ARCH }}/
   cp target/debug/rusthead artifacts/binaries-{{ ARCH }}/rusthead
-  docker build -t samply/rusthead:$TAG .
+  docker build -t $IMAGE .
 
 bootstrap: build
   mkdir -p {{ CONFIG_PATH }}
-  cd {{ CONFIG_PATH }} && bash <(docker run --rm samply/rusthead:$TAG bootstrap)
+  cd {{ CONFIG_PATH }} && bash <(docker run --rm $IMAGE bootstrap)

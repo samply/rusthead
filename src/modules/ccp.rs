@@ -10,6 +10,7 @@ use crate::{
         IdManagement, IdManagementConfig, OidcProvider, ServiceMap, Teiler, TeilerConfig,
         Transfair, TransfairConfig,
         obds2fhir::{Obds2Fhir, Obds2FhirConfig},
+        podest2fhir::{Podest2Fhir, Podest2FhirConfig},
     },
     utils::capitalize_first_letter,
 };
@@ -25,6 +26,7 @@ pub struct CcpConfig {
     exporter: Option<Empty>,
     datashield: Option<Empty>,
     obds2fhir: Option<Obds2FhirConfig>,
+    podest2fhir: Option<Podest2FhirConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,6 +62,9 @@ impl Module for CcpDefault {
         }
         if let Some(teiler_conf) = &ccp_conf.teiler {
             service_map.install_with_config::<Teiler<Self>>((teiler_conf, conf));
+        }
+        if let Some(podest_conf) = &ccp_conf.podest2fhir {
+            service_map.install_with_config::<Podest2Fhir<Self>>((podest_conf.clone(), "dktk"));
         }
     }
 }

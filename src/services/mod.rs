@@ -13,6 +13,7 @@ use crate::{Config, bridgehead::Bridgehead, modules::Module};
 pub mod beam_connect;
 pub mod dnpm_node;
 pub mod obds2fhir;
+pub mod podest2fhir;
 pub use beam_connect::BeamConnect;
 mod datashield;
 pub use datashield::DataShield;
