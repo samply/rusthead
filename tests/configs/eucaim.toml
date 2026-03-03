@@ -1,0 +1,7 @@
+site_id = "dummy"
+hostname = "dummy.local"
+
+[eucaim]
+endpoint_type = "eucaim-api"
+provider = "test-provider"
+provider_icon = "nothing"

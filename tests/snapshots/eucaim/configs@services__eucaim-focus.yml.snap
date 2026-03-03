@@ -1,0 +1,18 @@
+---
+source: src/config.rs
+expression: file
+info: services/eucaim-focus.yml
+input_file: tests/configs/eucaim.toml
+---
+services:
+  eucaim-focus:
+    image: docker.verbis.dkfz.de/cache/samply/focus:develop
+    environment:
+      BEAM_APP_ID_LONG: focus.dummy.broker.eucaim.cancerimage.eu
+      BEAM_PROXY_URL: http://eucaim-beam-proxy:8081/
+      API_KEY: "${EUCAIM_BEAM_PROXY_FOCUS_KEY}"
+      RETRY_COUNT: 128
+      EPSILON: 0.28
+      ENDPOINT_TYPE: "eucaim-api"
+      PROVIDER: "test-provider"
+      PROVIDER_ICON: "nothing"
