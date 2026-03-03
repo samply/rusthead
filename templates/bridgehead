@@ -121,7 +121,7 @@ Description=Bridgehead Service
 Requires=docker.service
 
 [Service]
-ExecStart={{ config_dir }}/bridgehead compose up
+ExecStart={{ config_dir }}/bridgehead compose up --abort-on-container-exit
 Restart=always
 User=bridgehead
 Group=docker

@@ -106,7 +106,7 @@ Description=Bridgehead Service
 Requires=docker.service
 
 [Service]
-ExecStart=[TMP_DIR]/bridgehead compose up
+ExecStart=[TMP_DIR]/bridgehead compose up --abort-on-container-exit
 Restart=always
 User=bridgehead
 Group=docker
