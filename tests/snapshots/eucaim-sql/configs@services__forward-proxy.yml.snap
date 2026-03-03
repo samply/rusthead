@@ -1,0 +1,18 @@
+---
+source: src/config.rs
+expression: file
+info: services/forward-proxy.yml
+input_file: tests/configs/eucaim-sql.toml
+---
+services:
+  forward-proxy:
+    image: docker.verbis.dkfz.de/cache/samply/bridgehead-forward-proxy:latest
+    
+    tmpfs:
+      - /var/log/squid
+      - /var/spool/squid
+    volumes:
+      - [TMP_DIR]/trusted-ca-certs:/docker/custom-certs/:ro
+    healthcheck:
+      # Wait 1s before marking this service healthy. Required for the oauth2-proxy to talk to the OIDC provider on startup which will fail if the forward proxy is not started yet.
+      test: ["CMD", "sleep", "1"]

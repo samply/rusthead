@@ -1,11 +1,13 @@
 mod bbmri;
 mod ccp;
 mod dnpm;
+mod eucaim;
 
 use crate::{Config, services::ServiceMap};
 pub use bbmri::BbmriConfig;
 pub use ccp::{CcpConfig, CcpDefault};
 pub use dnpm::DnpmConfig;
+pub use eucaim::{EucaimConfig, EucaimEndpointType};
 
 pub trait Module {
     fn install(&self, service_map: &mut ServiceMap, conf: &'static Config);
@@ -17,4 +19,9 @@ impl Module for &dyn Module {
     }
 }
 
-pub const MODULES: &[&dyn Module] = &[&ccp::CcpDefault, &bbmri::Bbmri, &dnpm::Dnpm];
+pub const MODULES: &[&dyn Module] = &[
+    &ccp::CcpDefault,
+    &bbmri::Bbmri,
+    &dnpm::Dnpm,
+    &eucaim::Eucaim,
+];
