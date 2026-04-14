@@ -1,3 +1,5 @@
+use rand::RngExt;
+
 /// Helper for serde(default = "path_to_fn") as it does not work with constants
 pub const fn enabled() -> bool {
     true
