@@ -6,7 +6,7 @@ input_file: tests/configs/example.config.toml
 ---
 services:
   gbn-focus:
-    image: docker.verbis.dkfz.de/cache/samply/focus:main-bbmri
+    image: docker.verbis.dkfz.de/cache/samply/focus:main
     environment:
       BEAM_APP_ID_LONG: focus.dummy.broker.bbmri.de
       BEAM_PROXY_URL: http://gbn-beam-proxy:8081/
