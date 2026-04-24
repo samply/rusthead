@@ -30,8 +30,8 @@ pub enum EucaimEndpointType {
 
 impl Module for Eucaim {
     fn install(&self, service_map: &mut ServiceMap, global_conf: &'static Config) {
-        if let Some(eucaimConfig) = global_conf.eucaim.clone() {
-            service_map.install_with_config::<Focus<Eucaim, EucaimEndpointType>>(eucaimConfig);
+        if let Some(eucaim_config) = global_conf.eucaim.clone() {
+            service_map.install_with_config::<Focus<Eucaim, EucaimEndpointType>>(eucaim_config);
         }
     }
 }

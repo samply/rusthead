@@ -1,0 +1,7 @@
+---
+source: src/config.rs
+expression: "toml::from_str::<toml::Table>(&file).unwrap()"
+info: config.local.toml
+input_file: tests/configs/eucaim.toml
+---
+seed = 42

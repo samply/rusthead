@@ -1,13 +1,16 @@
+---
+source: src/config.rs
+expression: file
+info: bridgehead
+input_file: tests/configs/eucaim-sql.toml
+---
 #!/usr/bin/env bash
 set -e
 set -o pipefail
 
-{%- let config_dir = conf.path|path %}
-{%- let priv_key_file = conf.path.join(format!("pki/{}.priv.pem", self.conf.site_id)) %}
-
 # Ensure the script is running in memory to avoid issues with self modification on update
 [ "$LOADED" = 1 ] || LOADED=1 exec bash <(cat "$0") "$@"
-cd {{ config_dir }}
+cd [TMP_DIR]
 
 
 main() {
@@ -18,13 +21,9 @@ main() {
             chown -R bridgehead:docker .
             chmod -R g+sw .
             sudo -u bridgehead git init -b main --shared=group
-            git config --global --add safe.directory {{ config_dir }}
+            git config --global --add safe.directory [TMP_DIR]
             git config --local user.email "bridgehead@samply.de"
             git config --local user.name "Bridgehead"
-            {%- if let Some(proxy_url) = conf.https_proxy_url %}
-            git config --local http.proxy {{ proxy_url }}
-            git config --local https.proxy {{ proxy_url }}
-            {%- endif %}
             if ! systemctl status docker &> /dev/null; then
                 echo "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
                 set +e
@@ -38,18 +37,13 @@ main() {
             else
                 install_systemd
             fi
-            {%- if beam_networks.is_empty() %}
-            echo "Installation complete."
-            echo "You may start the bridgehead service with 'systemctl start bridgehead' or '{{ config_dir }}/bridgehead compose up' now."
-            {%- else %}
-            if [ -e {{ priv_key_file.display() }} ]; then
+            if [ -e [TMP_DIR]/pki/dummy.priv.pem ]; then
                 echo "Private key already exists. Skipping enrollment."
-                echo "If you want to re-enroll or changed the configuration and are now included in a new beam network run 'sudo {{ config_dir }}/bridgehead enroll'."
+                echo "If you want to re-enroll or changed the configuration and are now included in a new beam network run 'sudo [TMP_DIR]/bridgehead enroll'."
                 echo "Installation complete."
             else
                 enroll
             fi
-            {%- endif %}
             ;;
         logs)
             shift
@@ -58,35 +52,31 @@ main() {
         compose)
             compose_files="$(ls services | awk '{print " -f services/" $0}')"
             [ -e ./docker-compose.override.yml ] && compose_files+=" -f docker-compose.override.yml"
-            {%- if !beam_networks.is_empty() %}
-            if [ ! -f {{ priv_key_file.display() }} ]; then
-                echo "Beam private key not found. Please run 'sudo {{ config_dir }}/bridgehead enroll' first."
+            if [ ! -f [TMP_DIR]/pki/dummy.priv.pem ]; then
+                echo "Beam private key not found. Please run 'sudo [TMP_DIR]/bridgehead enroll' first."
                 exit 1
             fi
-            {%- endif %}
             shift
             exec docker compose -p bridgehead --env-file .env $compose_files -f docker-image.lock.yml $@
             ;;
-        {%- if !beam_networks.is_empty() %}
         enroll)
             [ "$(id -u)" -ne 0 ] && echo "Enroll must be run as root." && exit 1
             enroll
             ;;
-        {%- endif %}
         update)
             docker image prune -f
-            docker pull {{ conf.image }} &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
+            docker pull samply/rusthead:latest &>/dev/null || echo "Failed to pull latest rusthead image. Using latest local image."
             # Mount the docker config if it exists to allow pulling from private registries if needed
             docker_config=~/.docker/config.json
             docker_config_mount=""
             [ -f "$docker_config" ] && docker_config_mount="-v $docker_config:/root/.docker/config.json:ro"
             docker run --rm \
-                -v {{ config_dir }}:{{ config_dir }} \
+                -v [TMP_DIR]:[TMP_DIR] \
                 -v /var/run/docker.sock:/var/run/docker.sock \
                 $docker_config_mount \
-                -e BRIDGEHEAD_CONFIG_PATH={{ config_dir }} \
+                -e BRIDGEHEAD_CONFIG_PATH=[TMP_DIR] \
                 -u "$(id -u bridgehead):$(id -g bridgehead)" \
-                {{ conf.image }} update
+                samply/rusthead:latest update
             ;;
         *)
             echo "Unknown bridgehead command '$@'"
@@ -94,25 +84,20 @@ main() {
             ;;
     esac
 }
-
-{%- if !beam_networks.is_empty() %}
 enroll() {
     do_enroll() {
-        echo "Enrolling {{ conf.site_id }}.$1"
+        echo "Enrolling dummy.$1"
         docker run --rm \
-            -v {{ config_dir }}/pki:{{ config_dir }}/pki \
+            -v [TMP_DIR]/pki:[TMP_DIR]/pki \
             docker.verbis.dkfz.de/cache/samply/beam-enroll:latest \
-            --output-file {{ priv_key_file.display() }} \
-            --proxy-id {{ conf.site_id }}.$1
-        chmod 600 {{ priv_key_file.display() }}
-        chown bridgehead:docker {{ priv_key_file.display() }}
+            --output-file [TMP_DIR]/pki/dummy.priv.pem \
+            --proxy-id dummy.$1
+        chmod 600 [TMP_DIR]/pki/dummy.priv.pem
+        chown bridgehead:docker [TMP_DIR]/pki/dummy.priv.pem
     }
-    {%- for broker in beam_networks %}
-    do_enroll {{ broker }}
-    {%- endfor %}
-    echo "After getting the csr{{ beam_networks.len()|pluralize }} enrolled you may start the bridgehead service with 'systemctl start bridgehead'."
+    do_enroll broker.eucaim.cancerimage.eu
+    echo "After getting the csr enrolled you may start the bridgehead service with 'systemctl start bridgehead'."
 }
-{%- endif %}
 
 install_systemd() {
     cat <<EOF > /etc/systemd/system/bridgehead.service
@@ -121,7 +106,7 @@ Description=Bridgehead Service
 Requires=docker.service
 
 [Service]
-ExecStart={{ config_dir }}/bridgehead compose up --abort-on-container-exit
+ExecStart=[TMP_DIR]/bridgehead compose up --abort-on-container-exit
 Restart=always
 User=bridgehead
 Group=docker
@@ -135,7 +120,7 @@ Description=Bridgehead Update Service
 Requires=docker.service
 
 [Service]
-ExecStart={{ config_dir }}/bridgehead update
+ExecStart=[TMP_DIR]/bridgehead update
 User=bridgehead
 Group=docker
 ExecStopPost=+/bin/bash -c 'if [ "\$EXIT_STATUS" = "3" ]; then systemctl restart bridgehead.service; fi'

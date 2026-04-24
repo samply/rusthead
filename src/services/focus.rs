@@ -46,7 +46,7 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
             beam,
             beam_and_blaze: PhantomData,
             endpoint_url: Some(Blaze::<B>::get_url()),
-            tag: tag.clone(),
+            tag,
             endpoint_type: "blaze".into(),
             exporter: None,
             provider_data: None,

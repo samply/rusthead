@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::BTreeMap, fs, ops::Deref, path::PathBuf};
 
-use rand::{Rng, SeedableRng, rngs::StdRng};
+use rand::{RngExt, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 

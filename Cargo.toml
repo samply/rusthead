@@ -6,8 +6,8 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1"
-bcrypt = "0.18.0"
-rand = "0.9"
+bcrypt = "0.19.0"
+rand = "0.10"
 askama = { version = "0.15", default-features = false, features = [
     "derive",
     "std",
@@ -15,15 +15,15 @@ askama = { version = "0.15", default-features = false, features = [
 serde = { version = "1", features = ["derive"] }
 toml = "1.0"
 url = { version = "2", features = ["serde"] }
-clap = { version = "4.5", features = ["derive", "env"] }
+clap = { version = "4.6", features = ["derive", "env"] }
 rcgen = "0.14.7"
 serde_json = "1"
 libc = "0.2"
 solvent = "0.8.3"
 
 [dev-dependencies]
-insta = { version = "1.46", features = ["filters", "glob", "toml"] }
-tempfile = "3.26"
+insta = { version = "1.47", features = ["filters", "glob", "toml"] }
+tempfile = "3.27"
 toml = { version = "*", features = ["preserve_order"] }
 
 [profile.dev]
