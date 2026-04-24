@@ -1,7 +1,7 @@
 
 services:
   {{ Self::service_name() }}:
-    image: ghcr.io/samply/podest2fhir:main
+    image: ghcr.io/samply/podest2fhir:{{ tag }}
     environment:
       FHIR_BASE_URL: {{ fhir_base_url }}
       DB_HOST: {{ db_host }}
