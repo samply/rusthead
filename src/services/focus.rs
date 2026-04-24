@@ -74,10 +74,7 @@ impl<T: BrokerProvider> Service for Focus<T, EucaimEndpointType> {
             beam,
             beam_and_blaze: PhantomData,
             endpoint_url: config.endpoint_url,
-            tag: match config.endpoint_type {
-                EucaimEndpointType::EucaimSql => "develop-query-sql".to_string(),
-                _ => "develop".to_string(),
-            },
+            tag: "develop".to_string(),
             endpoint_type: serde_json::to_string(&config.endpoint_type).unwrap(),
             exporter: None,
             provider_data: Some((config.provider, config.provider_icon)),
