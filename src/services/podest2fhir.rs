@@ -14,6 +14,12 @@ pub struct Podest2FhirConfig {
     pub db_port: u16,
     pub db_name: String,
     pub db_user: String,
+    #[serde(default = "default_tag")]
+    pub tag: String,
+}
+
+fn default_tag() -> String {
+    "main".to_string()
 }
 
 #[derive(Debug, Template)]
@@ -27,6 +33,7 @@ where
     db_port: u16,
     db_name: String,
     db_user: String,
+    tag: String,
     profile: &'static str,
     kind: PhantomData<T>,
 }
@@ -51,6 +58,7 @@ where
             db_port: conf.db_port,
             db_name: conf.db_name,
             db_user: conf.db_user,
+            tag: conf.tag,
             profile,
             kind: PhantomData,
         }
