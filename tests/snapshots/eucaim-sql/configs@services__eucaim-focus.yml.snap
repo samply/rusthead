@@ -6,7 +6,7 @@ input_file: tests/configs/eucaim-sql.toml
 ---
 services:
   eucaim-focus:
-    image: docker.verbis.dkfz.de/cache/samply/focus:develop-query-sql
+    image: docker.verbis.dkfz.de/cache/samply/focus:develop
     environment:
       BEAM_APP_ID_LONG: focus.dummy.broker.eucaim.cancerimage.eu
       BEAM_PROXY_URL: http://eucaim-beam-proxy:8081/
