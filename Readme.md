@@ -14,7 +14,8 @@ Or by manually creating a minimal config file like this:
 
 ```toml
 site_id = "test"
-hostname = "Test"
+# The hostname under which the bridgehead will be accessible. Can also be an IP address.
+hostname = "test-bridgehead.local"
 ```
 
 and running:
@@ -69,6 +70,9 @@ After making changes to the `config.toml` you need to commit them to the git rep
 git commit -am "Added service xyz"
 ./bridgehead update
 ```
+
+> [!NOTE]
+> When adding services that require a new beam network you need to also run `sudo ./bridgehead enroll` and follow the provided instructions.
 
 To see what changes were made by the update command by running `git diff HEAD~1`.
 After that you can restart the bridgehead by either restarting the systemd unit (`sudo systemctl restart bridgehead`) or by running `./bridgehead compose down` followed by `./bridgehead compose up`.
