@@ -3,7 +3,7 @@ use url::Url;
 
 use crate::{
     config::Config,
-    modules::{Module, eucaim},
+    modules::Module,
     services::{BrokerProvider, Focus, ServiceMap},
 };
 
