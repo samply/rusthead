@@ -26,7 +26,7 @@ EOF
 
     read -p "Proxy [${HTTPS_PROXY:-None}]: " proxy
     proxy="${proxy:-$HTTPS_PROXY}"
-    [ -n "$proxy" ] && echo "proxy = \"$proxy\"" >> "${config_dir}/config.toml"
+    [ -n "$proxy" ] && echo "https_proxy_url = \"$proxy\"" >> "${config_dir}/config.toml"
     [ -n "$IMAGE" ] && echo "image = \"$IMAGE\"" >> "${config_dir}/config.toml"
 
     echo "Configuration file created at ${config_dir}/config.toml"
