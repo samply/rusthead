@@ -6,7 +6,7 @@ use url::{Host, Url};
 
 use crate::{
     modules::{BbmriConfig, CcpConfig, DnpmConfig, EucaimConfig},
-    services::{BasicAuthUser, Service},
+    services::{BasicAuthUser, Service, TraefikConfig},
 };
 
 #[derive(Debug, Deserialize)]
@@ -26,6 +26,7 @@ pub struct Config {
     pub bbmri: Option<BbmriConfig>,
     pub dnpm: Option<DnpmConfig>,
     pub eucaim: Option<EucaimConfig>,
+    pub traefik: Option<TraefikConfig>,
     /// Path to the folder in which this config.toml was located
     #[serde(skip)]
     pub path: PathBuf,

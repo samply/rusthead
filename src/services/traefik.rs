@@ -9,10 +9,21 @@ use crate::{config::LocalConf, utils::filters};
 
 use super::Service;
 
+#[derive(Debug, Deserialize)]
+pub struct TraefikConfig {
+    tls: Option<TlsConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct TlsConfig {
+    cert_file: PathBuf,
+    key_file: PathBuf,
+}
+
 #[derive(Debug, Template)]
 #[template(path = "traefik.yml")]
 pub struct Traefik {
-    tls_dir: PathBuf,
+    tls: TlsConfig,
     local_conf: &'static RefCell<LocalConf>,
 }
 
@@ -43,22 +54,28 @@ impl Service for Traefik {
     type ServiceConfig = &'static crate::Config;
 
     fn from_config(conf: Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
-        let tls_dir = conf.path.join("traefik-tls");
-        fs::create_dir_all(&tls_dir).unwrap();
-        let full_chain = tls_dir.join("fullchain.pem");
-        let priv_key = tls_dir.join("privkey.pem");
+        let tls = if let Some(tls) = conf.traefik.as_ref().and_then(|t| t.tls.as_ref()) {
+            tls.clone()
+        } else {
+            let tls_dir = conf.path.join("traefik-tls");
+            fs::create_dir_all(&tls_dir).unwrap();
+            TlsConfig {
+                cert_file: tls_dir.join("fullchain.pem"),
+                key_file: tls_dir.join("privkey.pem"),
+            }
+        };
         match (
-            fs::exists(&full_chain).unwrap(),
-            fs::exists(&priv_key).unwrap(),
+            fs::exists(&tls.cert_file).unwrap(),
+            fs::exists(&tls.key_file).unwrap(),
         ) {
             (false, false) => {
                 eprintln!(
-                    "No ssl certs found for traefik in {tls_dir:?}. Generating self-signed certificate"
+                    "No ssl certs found for traefik {tls:?}. Generating self-signed certificate"
                 );
                 let CertifiedKey { cert, signing_key } =
                     rcgen::generate_simple_self_signed(vec![conf.hostname.to_string()]).unwrap();
-                fs::write(full_chain, cert.pem()).unwrap();
-                fs::write(priv_key, signing_key.serialize_pem()).unwrap();
+                fs::write(&tls.cert_file, cert.pem()).unwrap();
+                fs::write(&tls.key_file, signing_key.serialize_pem()).unwrap();
             }
             (true, false) => {
                 panic!("fullchain.pem exists but privkey.pem does not");
@@ -69,7 +86,7 @@ impl Service for Traefik {
             (true, true) => {}
         }
         Self {
-            tls_dir,
+            tls,
             local_conf: &conf.local_conf,
         }
     }

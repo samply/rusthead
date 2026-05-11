@@ -30,7 +30,8 @@ services:
       - source: certificates.yaml
         target: /configuration/certificates.yaml
     volumes:
-      - [TMP_DIR]/traefik-tls:/certs:ro
+      - [TMP_DIR]/traefik-tls/fullchain.pem:/certs/fullchain.pem:ro
+      - [TMP_DIR]/traefik-tls/privkey.pem:/certs/privkey.pem:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
 configs:

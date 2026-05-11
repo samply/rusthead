@@ -24,7 +24,8 @@ services:
       - source: certificates.yaml
         target: /configuration/certificates.yaml
     volumes:
-      - {{ tls_dir|path }}:/certs:ro
+      - {{ tls.cert_file|path }}:/certs/fullchain.pem:ro
+      - {{ tls.key_file|path }}:/certs/privkey.pem:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
 configs:
