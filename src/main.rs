@@ -47,6 +47,9 @@ fn main() -> anyhow::Result<ExitCode> {
                 .with_context(|| format!("Failed to load config from {config:?}"))?;
             let conf: &'static Config = Box::leak(Box::new(conf));
             Bridgehead::new(&conf).write()?;
+            println!(
+                "Bridgehead bootstrap complete. Run `sudo ./bridgehead install` to install the bridgehead service."
+            );
             return Ok(ExitCode::SUCCESS);
         }
         Args::Update { config } => config,

@@ -152,7 +152,6 @@ Persistent=true
 WantedBy=basic.target
 EOF
     systemctl daemon-reload
-    systemctl start bridgehead-update.service
     echo "Enabling autostart of bridgehead.service"
     systemctl enable bridgehead.service
     echo "Enabling auto-updates for bridgehead.service ..."

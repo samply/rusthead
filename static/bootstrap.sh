@@ -37,6 +37,6 @@ fi
 
 docker run --rm \
     -v $config_dir:$config_dir \
-    ${IMAGE:-samply/rusthead:latest} bootstrap bridgehead --config $config_dir
+    ${IMAGE:-samply/rusthead:latest} bootstrap bridgehead --config $config_dir > /dev/null
 sudo $config_dir/bridgehead install
 git config --global --add safe.directory $config_dir
