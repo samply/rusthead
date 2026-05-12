@@ -55,36 +55,39 @@ impl Service for Traefik {
 
     fn from_config(conf: Self::ServiceConfig, _deps: super::Deps<Self>) -> Self {
         let tls = if let Some(tls) = conf.traefik.as_ref().and_then(|t| t.tls.as_ref()) {
+            // We don't check if the certs exist as they might not be mounted into the container
             tls.clone()
         } else {
             let tls_dir = conf.path.join("traefik-tls");
             fs::create_dir_all(&tls_dir).unwrap();
-            TlsConfig {
+            let tls = TlsConfig {
                 cert_file: tls_dir.join("fullchain.pem"),
                 key_file: tls_dir.join("privkey.pem"),
-            }
+            };
+            match (
+                fs::exists(&tls.cert_file).unwrap(),
+                fs::exists(&tls.key_file).unwrap(),
+            ) {
+                (false, false) => {
+                    eprintln!(
+                        "No ssl certs found for traefik {tls_dir:?}. Generating self-signed certificate"
+                    );
+                    let CertifiedKey { cert, signing_key } =
+                        rcgen::generate_simple_self_signed(vec![conf.hostname.to_string()])
+                            .unwrap();
+                    fs::write(&tls.cert_file, cert.pem()).unwrap();
+                    fs::write(&tls.key_file, signing_key.serialize_pem()).unwrap();
+                }
+                (true, false) => {
+                    panic!("fullchain.pem exists but privkey.pem does not");
+                }
+                (false, true) => {
+                    panic!("privkey.pem exists but fullchain.pem does not");
+                }
+                (true, true) => {}
+            };
+            tls
         };
-        match (
-            fs::exists(&tls.cert_file).unwrap(),
-            fs::exists(&tls.key_file).unwrap(),
-        ) {
-            (false, false) => {
-                eprintln!(
-                    "No ssl certs found for traefik {tls:?}. Generating self-signed certificate"
-                );
-                let CertifiedKey { cert, signing_key } =
-                    rcgen::generate_simple_self_signed(vec![conf.hostname.to_string()]).unwrap();
-                fs::write(&tls.cert_file, cert.pem()).unwrap();
-                fs::write(&tls.key_file, signing_key.serialize_pem()).unwrap();
-            }
-            (true, false) => {
-                panic!("fullchain.pem exists but privkey.pem does not");
-            }
-            (false, true) => {
-                panic!("privkey.pem exists but fullchain.pem does not");
-            }
-            (true, true) => {}
-        }
         Self {
             tls,
             local_conf: &conf.local_conf,
