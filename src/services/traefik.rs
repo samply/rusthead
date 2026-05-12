@@ -5,7 +5,7 @@ use bcrypt::DEFAULT_COST;
 use rcgen::CertifiedKey;
 use serde::{Deserialize, Serialize};
 
-use crate::{config::LocalConf, utils::filters};
+use crate::config::LocalConf;
 
 use super::Service;
 
