@@ -26,9 +26,11 @@ pub fn secret_from_rng<const N: usize>(rng: &mut impl rand::Rng) -> String {
 }
 
 pub mod filters {
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     use askama::Values;
+
+    use crate::config::Config;
 
     #[askama::filter_fn]
     pub fn path(p: &PathBuf, _: &dyn Values) -> askama::Result<String> {
@@ -40,6 +42,36 @@ pub mod filters {
             })?
             .display()
             .to_string())
+    }
+
+    #[askama::filter_fn]
+    pub fn make_volume(name: &str, ctx: &dyn Values) -> askama::Result<String> {
+        let config = ctx
+            .get_value("config")
+            .unwrap()
+            .downcast_ref::<Config>()
+            .unwrap();
+        if let Some(volume_dir) = &config.volume_dir {
+            let path = config.path.join(&volume_dir);
+            fs::create_dir_all(&path).map_err(|e| {
+                askama::Error::custom(
+                    anyhow::Error::from(e)
+                        .context(format!("Failed to create volume directory {volume_dir:?}")),
+                )
+            })?;
+            let abs_path = path.canonicalize().map_err(|e| {
+                askama::Error::custom(
+                    anyhow::Error::from(e)
+                        .context(format!("Failed to canonicalize volume {volume_dir:?}")),
+                )
+            })?;
+            Ok(format!(
+                "{name}:\n    driver: local\n    driver_opts:\n      o: bind\n      type: none\n      device: {}",
+                abs_path.display()
+            ))
+        } else {
+            Ok(format!("{name}:"))
+        }
     }
 }
 

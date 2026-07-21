@@ -1,3 +1,6 @@
+{%- let data_volume = "transfair-data" -%}
+{%- let input_blaze_data_volume = "transfair-input-blaze-data" -%}
+{%- let request_blaze_data_volume = "transfair-request-blaze-data" -%}
 services:
   transfair:
     image: docker.verbis.dkfz.de/cache/samply/transfair:latest
@@ -37,7 +40,7 @@ services:
       - TLS_CA_CERTIFICATES_DIR=/conf/trusted-ca-certs
       - TLS_DISABLE={{ conf.tls_disable }}
     volumes:
-      - transfair-data:/transfair
+      - {{ data_volume }}:/transfair
       - {{ trusted_ca_certs.display() }}:/conf/trusted-ca-certs:ro
 
 {%- if conf.fhir_input.is_none() %}
@@ -51,7 +54,7 @@ services:
       CQL_EXPR_CACHE_SIZE: 8
       ENFORCE_REFERENTIAL_INTEGRITY: "false"
     volumes:
-      - "transfair-input-blaze-data:/app/data"
+      - "{{ input_blaze_data_volume }}:/app/data"
 {%- endif %}
 
 {%- if conf.fhir_requests.is_none() %}
@@ -65,14 +68,10 @@ services:
       CQL_EXPR_CACHE_SIZE: 8
       ENFORCE_REFERENTIAL_INTEGRITY: "false"
     volumes:
-      - "transfair-request-blaze-data:/app/data"
+      - "{{ request_blaze_data_volume }}:/app/data"
 {%- endif %}
 
 volumes:
-{%- if conf.fhir_input.is_none() %}
-  transfair-input-blaze-data:
-{%- endif %}
-{%- if conf.fhir_requests.is_none() %}
-  transfair-request-blaze-data:
-{%- endif %}
-  transfair-data:
+  {% if conf.fhir_input.is_none() %}{{ input_blaze_data_volume|make_volume }}
+  {% endif %}{% if conf.fhir_requests.is_none() %}{{ request_blaze_data_volume|make_volume }}
+  {% endif %}{{ data_volume|make_volume }}

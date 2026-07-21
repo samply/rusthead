@@ -4,7 +4,6 @@ expression: file
 info: services/dnpm-node.yml
 input_file: tests/configs/example.config.toml
 ---
-
 services:
   dnpm-mysql:
     image: mysql:9

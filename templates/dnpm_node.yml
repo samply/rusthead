@@ -1,4 +1,8 @@
 
+{%- let mysql_volume = "dnpm-mysql" -%}
+{%- let authup_volume = "dnpm-authup" -%}
+{%- let backend_data_volume = "dnpm-backend-data" -%}
+
 services:
   dnpm-mysql:
     image: mysql:9
@@ -11,12 +15,12 @@ services:
       MYSQL_ROOT_HOST: "%"
       MYSQL_ROOT_PASSWORD: {{ mysql_root_password }}
     volumes:
-      - dnpm-mysql:/var/lib/mysql
+      - {{ mysql_volume }}:/var/lib/mysql
 
   dnpm-authup:
     image: authup/authup:latest
     volumes:
-      - dnpm-authup:/usr/src/app/writable
+      - {{ authup_volume }}:/usr/src/app/writable
     depends_on:
       dnpm-mysql:
         condition: service_healthy
@@ -64,7 +68,7 @@ services:
       - AUTHUP_URL=robot://system:{{ authup_secret }}@http://dnpm-authup:3000
       - TZ=Europe/Berlin
     volumes:
-      - dnpm-backend-data:/dnpm_data
+      - {{ backend_data_volume }}:/dnpm_data
     configs:
       - source: dnpm-production.conf
         target: /dnpm_config/production.conf
@@ -98,9 +102,9 @@ services:
       - "traefik.http.middlewares.dnpm-backend-peer.ipWhiteList.sourceRange=0.0.0.0/32"
 
 volumes:
-  dnpm-authup:
-  dnpm-mysql:
-  dnpm-backend-data:
+  {{ authup_volume|make_volume }}
+  {{ mysql_volume|make_volume }}
+  {{ backend_data_volume|make_volume }}
 
 configs:
   dnpm-production.conf:

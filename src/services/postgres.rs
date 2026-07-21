@@ -2,6 +2,8 @@ use std::marker::PhantomData;
 
 use askama::Template;
 
+use crate::utils::filters;
+
 use super::Service;
 
 #[derive(Debug, Template)]

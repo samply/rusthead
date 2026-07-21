@@ -183,14 +183,15 @@ service_tuple!(T1, T2, T3);
 service_tuple!(T1, T2, T3, T4);
 
 pub trait ToCompose: Any {
-    fn render(&self) -> anyhow::Result<String>;
+    fn render(&self, config: &'static Config) -> anyhow::Result<String>;
 
     fn service_name(&self) -> String;
 }
 
 impl<T: Template + Service> ToCompose for T {
-    fn render(&self) -> anyhow::Result<String> {
-        Template::render(self)
+    fn render(&self, config: &'static Config) -> anyhow::Result<String> {
+        let values = [("config", config as &dyn Any)];
+        Template::render_with_values(self, &values as &dyn askama::Values)
             .with_context(|| format!("Failed to render {}", std::any::type_name::<T>()))
     }
 
@@ -356,7 +357,7 @@ impl ServiceMap {
             eprintln!("Generating service {service_name}");
             fs::write(
                 services_dir.join(format!("{}.yml", service.service_name())),
-                service.render()?,
+                service.render(self.config)?,
             )?;
         }
         Ok(())

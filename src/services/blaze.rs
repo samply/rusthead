@@ -3,6 +3,8 @@ use std::{marker::PhantomData, str::FromStr};
 use askama::Template;
 use url::Url;
 
+use crate::utils::filters;
+
 use super::{Service, Traefik};
 
 #[derive(Debug, Template)]
