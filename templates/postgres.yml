@@ -1,3 +1,4 @@
+{% let data_volume = Self::service_name() %}
 services:
   {{ Self::service_name() }}:
     image: docker.verbis.dkfz.de/cache/postgres:15.6-alpine
@@ -6,7 +7,7 @@ services:
       POSTGRES_DB: {{ realm }}
       POSTGRES_PASSWORD: {{ password }}
     volumes:
-      - "{{ Self::service_name() }}:/var/lib/postgresql/data"
+      - "{{ data_volume }}:/var/lib/postgresql/data"
 
 volumes:
-  {{ Self::service_name() }}:
+  {{ data_volume|make_volume }}

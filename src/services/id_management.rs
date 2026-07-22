@@ -4,7 +4,7 @@ use crate::{
     config::Config,
     modules::CcpDefault,
     services::{OidcClient, OidcProvider, PrivateOidcClient, postgres::PgConnectInfo},
-    utils::capitalize_first_letter,
+    utils::{capitalize_first_letter, filters},
 };
 
 use super::{ForwardProxy, Service, ToCompose, Traefik, postgres::Postgres};
