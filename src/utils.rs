@@ -52,7 +52,7 @@ pub mod filters {
             .downcast_ref::<Config>()
             .unwrap();
         if let Some(volume_dir) = &config.volume_dir {
-            let path = config.path.join(&volume_dir);
+            let path = config.path.join(&volume_dir).join(name);
             fs::create_dir_all(&path).map_err(|e| {
                 askama::Error::custom(
                     anyhow::Error::from(e)

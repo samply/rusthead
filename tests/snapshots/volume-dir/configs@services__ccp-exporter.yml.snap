@@ -58,10 +58,10 @@ volumes:
     driver_opts:
       o: bind
       type: none
-      device: [TMP_DIR]/data
+      device: [TMP_DIR]/data/ccp-exporter-files
   ccp-reporter-files:
     driver: local
     driver_opts:
       o: bind
       type: none
-      device: [TMP_DIR]/data
+      device: [TMP_DIR]/data/ccp-reporter-files
