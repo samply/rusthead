@@ -39,7 +39,7 @@ impl Module for CcpDefault {
         let Some(ccp_conf) = conf.ccp.as_ref() else {
             return;
         };
-        service_map.install_with_config::<Focus<Self, Blaze<Self>>>("main-dktk".into());
+        service_map.install_with_config::<Focus<Self, Blaze<Self>>>("main".into());
         if let Some(idm_conf) = &ccp_conf.id_manager {
             service_map.install_with_config::<IdManagement<Self>>((idm_conf, conf));
             if let Some(obds_conf) = &ccp_conf.obds2fhir {
