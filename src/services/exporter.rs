@@ -38,7 +38,7 @@ impl<T: BrokerProvider + BlazeProvider + OidcProvider> Service for Exporter<T> {
             .borrow_mut()
             .generate_secret::<10, Self>("api-key");
         focus.enable_exporter(
-            format!("http://{}:8080", Self::service_name()),
+            format!("http://{}:8092", Self::service_name()),
             api_key.clone(),
         );
         let opal_password = if let Some(ds) = ds {
