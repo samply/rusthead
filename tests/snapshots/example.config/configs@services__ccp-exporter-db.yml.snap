@@ -4,6 +4,7 @@ expression: file
 info: services/ccp-exporter-db.yml
 input_file: tests/configs/example.config.toml
 ---
+
 services:
   ccp-exporter-db:
     image: docker.verbis.dkfz.de/cache/postgres:15.6-alpine

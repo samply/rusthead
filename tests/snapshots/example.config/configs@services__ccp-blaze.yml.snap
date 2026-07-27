@@ -5,6 +5,7 @@ info: services/ccp-blaze.yml
 input_file: tests/configs/example.config.toml
 ---
 
+
 services:
   ccp-blaze:
     image: docker.verbis.dkfz.de/cache/samply/blaze:latest

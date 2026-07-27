@@ -5,6 +5,7 @@ info: services/ccp-id-management.yml
 input_file: tests/configs/example.config.toml
 ---
 
+
 services:
   id-manager:
     image: docker.verbis.dkfz.de/bridgehead/magicpl

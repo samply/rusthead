@@ -6,6 +6,7 @@ input_file: tests/configs/example.config.toml
 ---
 
 
+
 services:
   ccp-opal:
     image: docker.verbis.dkfz.de/ccp/dktk-opal:latest
