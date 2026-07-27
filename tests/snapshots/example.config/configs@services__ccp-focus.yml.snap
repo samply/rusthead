@@ -6,7 +6,7 @@ input_file: tests/configs/example.config.toml
 ---
 services:
   ccp-focus:
-    image: docker.verbis.dkfz.de/cache/samply/focus:main-dktk
+    image: docker.verbis.dkfz.de/cache/samply/focus:main
     environment:
       BEAM_APP_ID_LONG: focus.dummy.broker.ccp-it.dktk.dkfz.de
       BEAM_PROXY_URL: http://ccp-beam-proxy:8081/
