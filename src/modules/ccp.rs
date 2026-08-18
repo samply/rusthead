@@ -101,7 +101,7 @@ impl OidcProvider for CcpDefault {
 
     fn oidc_provider_id() -> String {
         format!(
-            "secret-sync-central.test-secret-sync.{}",
+            "secret-sync-central.central-secret-sync.{}",
             Self::BeamProvider::broker_id()
         )
     }
