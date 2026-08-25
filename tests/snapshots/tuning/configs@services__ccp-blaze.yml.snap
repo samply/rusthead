@@ -2,7 +2,7 @@
 source: src/config.rs
 expression: file
 info: services/ccp-blaze.yml
-input_file: tests/configs/example.config.toml
+input_file: tests/configs/tuning.toml
 ---
 
 
@@ -12,8 +12,10 @@ services:
     environment:
       BASE_URL: http://ccp-blaze:8080
       ENFORCE_REFERENTIAL_INTEGRITY: "false"
-      DB_BLOCK_CACHE_SIZE: "1024"
-      CQL_EXPR_CACHE_SIZE: "128"
+      JAVA_TOOL_OPTIONS: "-Xmx8g"
+      DB_BLOCK_CACHE_SIZE: "8192"
+      CQL_EXPR_CACHE_SIZE: "512"
+      DB_RESOURCE_CACHE_SIZE_RATIO: "0.4"
     volumes:
       - "ccp-blaze-data:/app/data"
     labels:

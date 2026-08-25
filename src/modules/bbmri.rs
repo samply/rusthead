@@ -1,7 +1,9 @@
 use serde::Deserialize;
 
 use crate::config::Environment;
-use crate::services::{Blaze, BlazeProvider, BrokerProvider, DirectorySyncConfig, Focus};
+use crate::services::{
+    Blaze, BlazeConfig, BlazeProvider, BrokerProvider, DirectorySyncConfig, Focus,
+};
 use crate::utils::enabled;
 
 use super::Module;
@@ -14,6 +16,7 @@ pub struct BbmriConfig {
     #[serde(default)]
     gbn: bool,
     directory_sync: Option<DirectorySyncConfig>,
+    blaze: Option<BlazeConfig>,
 }
 
 pub struct Bbmri;
@@ -54,6 +57,10 @@ impl BlazeProvider for Bbmri {
             middleware_and_user_name: "bbmri-blaze".to_owned(),
             path: "/bbmri-localdatamanagement".to_owned(),
         })
+    }
+
+    fn blaze_config(conf: &'static crate::config::Config) -> Option<&'static BlazeConfig> {
+        conf.bbmri.as_ref()?.blaze.as_ref()
     }
 }
 
