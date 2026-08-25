@@ -6,9 +6,9 @@ use url::Url;
 use crate::{
     config::Config,
     services::{
-        Blaze, BlazeProvider, BlazeTraefikConfig, BrokerProvider, DataShield, Exporter, Focus,
-        IdManagement, IdManagementConfig, OidcProvider, ServiceMap, Teiler, TeilerConfig,
-        Transfair, TransfairConfig,
+        Blaze, BlazeConfig, BlazeProvider, BlazeTraefikConfig, BrokerProvider, DataShield,
+        Exporter, Focus, IdManagement, IdManagementConfig, OidcProvider, ServiceMap, Teiler,
+        TeilerConfig, Transfair, TransfairConfig,
         obds2fhir::{Obds2Fhir, Obds2FhirConfig},
         podest2fhir::{Podest2Fhir, Podest2FhirConfig},
     },
@@ -27,6 +27,7 @@ pub struct CcpConfig {
     datashield: Option<Empty>,
     obds2fhir: Option<Obds2FhirConfig>,
     podest2fhir: Option<Podest2FhirConfig>,
+    blaze: Option<BlazeConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,6 +80,10 @@ impl BlazeProvider for CcpDefault {
             middleware_and_user_name: "ccp-blaze".into(),
             path: "/ccp-localdatamanagement".into(),
         })
+    }
+
+    fn blaze_config(conf: &'static Config) -> Option<&'static BlazeConfig> {
+        conf.ccp.as_ref()?.blaze.as_ref()
     }
 }
 

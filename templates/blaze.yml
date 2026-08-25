@@ -6,6 +6,16 @@ services:
     environment:
       BASE_URL: {{ Self::get_url().to_string().trim_end_matches('/') }}
       ENFORCE_REFERENTIAL_INTEGRITY: "false"
+    {%- if let Some(heap_size) = tuning.heap_size %}
+      JAVA_TOOL_OPTIONS: "-Xmx{{ heap_size }}"
+    {%- endif %}
+      DB_BLOCK_CACHE_SIZE: "{{ tuning.block_cache_size }}"
+    {%- if tuning.cql_expr_cache_size > 0 %}
+      CQL_EXPR_CACHE_SIZE: "{{ tuning.cql_expr_cache_size }}"
+    {%- endif %}
+    {%- if let Some(ratio) = tuning.resource_cache_size_ratio %}
+      DB_RESOURCE_CACHE_SIZE_RATIO: "{{ ratio }}"
+    {%- endif %}
     volumes:
       - "{{ data_volume }}:/app/data"
     {% if let Some(traefik_conf) = traefik_conf -%}

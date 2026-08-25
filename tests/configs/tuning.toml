@@ -1,0 +1,8 @@
+site_id = "dummy"
+hostname = "dummy.local"
+
+[ccp.blaze]
+heap_size = "8g"
+block_cache_size = 8192
+cql_expr_cache_size = 512
+resource_cache_size_ratio = 0.4
