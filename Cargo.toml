@@ -20,6 +20,7 @@ rcgen = "0.14.8"
 serde_json = "1"
 libc = "0.2"
 solvent = "0.8.3"
+duct = "1.1.2"
 
 [dev-dependencies]
 insta = { version = "1.47", features = ["filters", "glob", "toml"] }

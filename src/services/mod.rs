@@ -8,7 +8,7 @@ use std::{
 use anyhow::Context;
 use askama::Template;
 
-use crate::{Config, bridgehead::Bridgehead, modules::Module};
+use crate::{Config, modules::Module};
 
 pub mod beam_connect;
 pub mod dnpm_node;
@@ -230,9 +230,11 @@ impl std::fmt::Debug for ServiceMap {
 }
 
 impl ServiceMap {
-    const ROOT_NODE: TypeId = TypeId::of::<Bridgehead>();
+    const ROOT_NODE: TypeId = TypeId::of::<()>();
 
     pub fn new(config: &'static Config) -> Self {
+        // Rebuild configured networks while retaining enrollment history.
+        config.local_conf.borrow_mut().beam_networks.clear();
         let mut deps = solvent::DepGraph::new();
         deps.register_node(Self::ROOT_NODE);
         Self {
@@ -253,7 +255,6 @@ impl ServiceMap {
         self.materialize();
         self.write_composables()
             .context("Failed to write services")?;
-        Bridgehead::new(self.config).write()?;
         self.config.write_local_conf()?;
         fs::write(
             self.config.path.join(".gitignore"),
@@ -363,7 +364,7 @@ impl ServiceMap {
         Ok(())
     }
 
-    fn materialize(&mut self) {
+    pub(crate) fn materialize(&mut self) {
         let deps = std::mem::take(&mut self.deps);
         for dep in deps.dependencies_of(&Self::ROOT_NODE).unwrap() {
             let dep = dep.expect("No cycle");
