@@ -67,11 +67,12 @@ impl<T: BrokerProvider + OidcProvider> Service for DataShield<T> {
         }
 
         let tm_beam = beam_proxy.add_service("token-manager");
+        let oidc = OidcClient::<T>::add_private_redirect_path(conf, "/opal/*");
         let mut local_conf = conf.local_conf.borrow_mut();
         Self {
             fw_proxy_url: fw_proxy.get_url(),
             tm_beam,
-            oidc: OidcClient::<T>::add_private_redirect_path(conf, "/opal/*"),
+            oidc,
             db: pg.connect_info(),
             exporter_password: None,
             tm_pw: local_conf.generate_secret::<10, Self>("token-manager"),

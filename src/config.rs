@@ -1,5 +1,12 @@
-use std::{cell::RefCell, collections::BTreeMap, fs, ops::Deref, path::PathBuf};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    ops::Deref,
+    path::PathBuf,
+};
 
+use anyhow::Context;
 use rand::{RngExt, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use url::{Host, Url};
@@ -56,15 +63,25 @@ impl Config {
             path.is_absolute(),
             "Path to config must be absolute unlike {path:?}"
         );
-        let mut conf: Config = toml::from_str(&std::fs::read_to_string(path.join("config.toml"))?)?;
-        conf.path = path.clone();
-        let local_conf = fs::read_to_string(conf.local_conf_path())
-            .ok()
-            .and_then(|data| toml::from_str(&data).ok())
-            .unwrap_or_else(|| {
-                eprintln!("Failed to read local config creating a new one");
-                LocalConf::default()
-            });
+        let file = if path.is_dir() {
+            path.join("config.toml")
+        } else {
+            path.clone()
+        };
+        let mut conf: Config = toml::from_str(&std::fs::read_to_string(&file)?)?;
+        conf.path = file.parent().unwrap().to_path_buf();
+        let mut local_conf: LocalConf = match fs::read_to_string(conf.local_conf_path()) {
+            Ok(data) => toml::from_str(&data).context("Failed to parse config.local.toml")?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => LocalConf::default(),
+            Err(error) => return Err(error).context("Failed to read config.local.toml"),
+        };
+        if !conf
+            .path
+            .join(format!("pki/{}.priv.pem", conf.site_id))
+            .try_exists()?
+        {
+            local_conf.enrolled_beam_networks.clear();
+        }
         conf.local_conf = RefCell::new(local_conf);
         Ok(conf)
     }
@@ -80,12 +97,18 @@ impl Config {
     }
 
     pub fn write_local_conf(&self) -> anyhow::Result<()> {
-        let conf_str = toml::to_string_pretty(self.local_conf.borrow().deref())?;
-        fs::write(self.local_conf_path(), conf_str)?;
+        self.save_local_conf()?;
         fs::write(
             self.path.join(".env"),
             self.local_conf.borrow().to_env()?.as_bytes(),
         )?;
+        Ok(())
+    }
+
+    /// Persist enrollment progress without rewriting the generated environment.
+    pub fn save_local_conf(&self) -> anyhow::Result<()> {
+        let conf_str = toml::to_string_pretty(self.local_conf.borrow().deref())?;
+        fs::write(self.local_conf_path(), conf_str)?;
         Ok(())
     }
 }
@@ -97,6 +120,13 @@ pub struct LocalConf {
     seed: u32,
     pub oidc: Option<BTreeMap<String, String>>,
     pub basic_auth_users: Option<BTreeMap<String, BasicAuthUser>>,
+    /// Networks required by the current service configuration.
+    #[serde(default)]
+    pub beam_networks: BTreeSet<String>,
+    /// Networks for which the local enrollment command completed successfully.
+    /// Retained when a network is disabled so re-enabling it does not re-enroll it.
+    #[serde(default)]
+    pub enrolled_beam_networks: BTreeSet<String>,
     #[serde(skip)]
     pub generated_secrets: BTreeMap<String, String>,
 }
@@ -111,12 +141,21 @@ impl Default for LocalConf {
             seed: generate_seed(),
             oidc: None,
             basic_auth_users: None,
+            beam_networks: Default::default(),
+            enrolled_beam_networks: Default::default(),
             generated_secrets: Default::default(),
         }
     }
 }
 
 impl LocalConf {
+    pub fn pending_beam_networks(&self) -> BTreeSet<String> {
+        self.beam_networks
+            .difference(&self.enrolled_beam_networks)
+            .cloned()
+            .collect()
+    }
+
     #[must_use]
     pub fn generate_secret<const N: usize, T: Service>(&mut self, name: &str) -> String {
         let name = format!(
@@ -154,12 +193,7 @@ impl LocalConf {
 
 #[cfg(test)]
 mod tests {
-    use std::process::{Command, Stdio};
-
-    use crate::{
-        modules,
-        services::{BEAM_NETWORKS, ServiceMap},
-    };
+    use crate::{modules, services::ServiceMap};
 
     use super::*;
 
@@ -179,7 +213,7 @@ mod tests {
                 .iter()
                 .for_each(|&m| services.install_module(m));
             services.write_all().unwrap();
-            let has_beam_networks = !BEAM_NETWORKS.take().is_empty();
+            let has_beam_networks = !conf.local_conf.borrow().beam_networks.is_empty();
             let has_services = services.len() > 0;
             let tmp_dir_path = temp_dir.path().display().to_string();
             let filters = [(tmp_dir_path.as_str(), "[TMP_DIR]")];
@@ -222,20 +256,12 @@ mod tests {
                 )
                 .unwrap();
             }
-            fs::write(
-                temp_dir.path().join("docker-image.lock.yml"),
-                "services: {}\n",
-            )
-            .unwrap();
-            let out = Command::new("./bridgehead")
-                .current_dir(temp_dir.path())
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .arg("compose")
-                .arg("config")
-                .spawn()
+            let out = crate::compose_command(temp_dir.path(), &["config".into()])
                 .unwrap()
-                .wait_with_output()
+                .stdout_capture()
+                .stderr_capture()
+                .unchecked()
+                .run()
                 .unwrap();
             assert!(
                 out.status.success(),

@@ -4,6 +4,30 @@ A tool for generating docker compose files for the `Samply.Bridgehead` based on 
 
 ## Installation
 
+The native Rust CLI can install an existing configuration directly:
+
+```bash
+sudo /path/to/rusthead --config /path/to/config.toml install
+```
+
+This requires Docker (including its `docker` group), Git, and sudo. It creates or reuses
+the `bridgehead` account, configures a shared Git repository, and enables the systemd
+service and daily update timer when Docker runs under systemd. Otherwise it runs an
+update immediately. Re-running `install` preserves existing Beam private keys and
+does not duplicate Git trust entries. Systemd uses the current Rust executable's
+absolute path, so keep the binary at that location. To enroll pending networks, run
+the same command with `enroll` instead of `install`.
+
+`config.local.toml` persists `beam_networks` required by the current configuration
+and `enrolled_beam_networks` for which the enrollment command has succeeded. Both
+`install` and `enroll` process only pending networks, saving each success separately
+so interrupted enrollment can be retried. CSR approval remains a separate step.
+Disabled networks retain their enrollment history. After changing `site_id`, clear
+`enrolled_beam_networks` manually. Removing the private key resets that history.
+Existing installations without enrollment
+history treat all configured networks as pending, even when a private key exists.
+To re-enroll a network explicitly, remove it from `enrolled_beam_networks` first.
+
 The rustehead can either be installed by following the installation wizard run with:
 
 ```bash
