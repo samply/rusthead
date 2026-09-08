@@ -125,6 +125,13 @@ fn repeated_install_preserves_repository_and_private_key() {
     assert_eq!(log.lines().filter(|line| *line == "useradd").count(), 1);
     assert_eq!(log.lines().filter(|line| *line == "enroll").count(), 1);
     assert!(log.contains(root.join("site with spaces/custom.toml").to_str().unwrap()));
+    let managed = root.join("site with spaces/.rusthead/bin/rusthead");
+    assert!(managed.is_file());
+    assert!(log.contains(managed.to_str().unwrap()));
+    assert_ne!(
+        fs::metadata(managed).unwrap().permissions().mode() & 0o111,
+        0
+    );
     let key = root.join("site with spaces/pki/test.priv.pem");
     assert_eq!(fs::read_to_string(&key).unwrap(), "private key\n");
     assert_eq!(

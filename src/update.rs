@@ -124,6 +124,10 @@ pub fn run(config: &PathBuf, mode: Mode) -> anyhow::Result<ExitCode> {
     }
     // Pulling may have changed both the configuration and its local path settings.
     let conf = Box::leak(Box::new(Config::load(&config)?));
+    if let Some(replacement) = crate::self_update::check(conf)? {
+        drop(_lock);
+        return replacement.resume(&config, mode);
+    }
     state::ensure_ignore(conf)?;
     let start_inputs = inputs(&repo, conf, &config)?;
     let head = repo.head()?;

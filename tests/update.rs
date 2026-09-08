@@ -9,6 +9,7 @@ struct Site {
     _temp: tempfile::TempDir,
     root: PathBuf,
     bin: PathBuf,
+    executable: PathBuf,
 }
 impl Site {
     fn new() -> Self {
@@ -17,6 +18,11 @@ impl Site {
         let bin = temp.path().join("bin");
         fs::create_dir(&root).unwrap();
         fs::create_dir(&bin).unwrap();
+        fs::copy(
+            env!("CARGO_BIN_EXE_rusthead"),
+            temp.path().join("image-rusthead"),
+        )
+        .unwrap();
         fs::write(
             root.join("custom.toml"),
             "site_id = 'test'\nhostname = 'localhost'\n[ccp]\n",
@@ -25,6 +31,13 @@ impl Site {
         fs::write(bin.join("docker"), r#"#!/bin/sh
 set -eu
 printf '%s\n' "$*" >> "$TEST_SITE/docker.log"
+case "$1" in
+  pull) test ! -f "$TEST_SITE/fail-binary-pull"; exit 0 ;;
+  image) printf 'linux/amd64 sha256:%s\n' "$(cat "$TEST_SITE/binary-id" 2>/dev/null || echo one)"; exit 0 ;;
+  create) echo extraction-container; exit 0 ;;
+  cp) test ! -f "$TEST_SITE/fail-copy"; cp "$TEST_SITE/image-rusthead" "$3"; exit 0 ;;
+  rm) exit 0 ;;
+esac
 case " $* " in
   *' --lock-image-digests '*)
     test ! -f "$TEST_SITE/fail-resolve"
@@ -41,10 +54,11 @@ esac
             _temp: temp,
             root,
             bin,
+            executable: env!("CARGO_BIN_EXE_rusthead").into(),
         }
     }
     fn command(&self, args: &[&str]) -> duct::Expression {
-        duct::cmd(env!("CARGO_BIN_EXE_rusthead"), args)
+        duct::cmd(&self.executable, args)
             .dir(&self.root)
             .env(
                 "PATH",
@@ -449,7 +463,11 @@ fn bare_update_requires_a_mode_and_empty_installations_are_supported() {
     .unwrap();
     site.expect("sync", 3);
     site.expect("sync", 0);
-    assert!(!site._temp.path().join("docker.log").exists());
+    assert!(
+        !fs::read_to_string(site._temp.path().join("docker.log"))
+            .unwrap()
+            .contains("compose")
+    );
 }
 
 #[test]
@@ -495,4 +513,116 @@ fn enrollment_receipts_do_not_dirty_inputs_and_survive_update_baseline_reset() {
         saved
     );
     assert!(!site.git(&["ls-files"]).contains("enrollment.json"));
+}
+
+#[test]
+fn self_update_replaces_only_changed_binaries_and_resumes_once() {
+    use std::{io::Write, os::unix::fs::MetadataExt};
+    let mut site = Site::new();
+    site.executable = site._temp.path().join("installed-rusthead");
+    fs::copy(env!("CARGO_BIN_EXE_rusthead"), &site.executable).unwrap();
+    let original_inode = fs::metadata(&site.executable).unwrap().ino();
+    site.expect("commit", 3);
+    site.expect("sync", 0);
+    assert_eq!(
+        original_inode,
+        fs::metadata(&site.executable).unwrap().ino()
+    );
+    let log = fs::read_to_string(site._temp.path().join("docker.log")).unwrap();
+    assert_eq!(
+        log.lines()
+            .filter(|line| line.starts_with("create "))
+            .count(),
+        1
+    );
+    // Simulate a new build without compiling a second Rust binary: ELF permits trailing data.
+    let mut image = fs::OpenOptions::new()
+        .append(true)
+        .open(site._temp.path().join("image-rusthead"))
+        .unwrap();
+    image.write_all(b"new build").unwrap();
+    drop(image);
+    fs::write(site._temp.path().join("binary-id"), "two").unwrap();
+    fs::write(site._temp.path().join("digest"), "two").unwrap();
+    let out = site.expect("sync", 3);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("continuing with the updated version"));
+    assert_ne!(
+        original_inode,
+        fs::metadata(&site.executable).unwrap().ino()
+    );
+    assert_eq!(
+        fs::read(&site.executable).unwrap(),
+        fs::read(site._temp.path().join("image-rusthead")).unwrap()
+    );
+    let log = fs::read_to_string(site._temp.path().join("docker.log")).unwrap();
+    assert_eq!(
+        log.lines()
+            .filter(|line| line.starts_with("pull --platform"))
+            .count(),
+        3
+    );
+    assert_eq!(
+        log.lines()
+            .filter(|line| line.starts_with("create "))
+            .count(),
+        2
+    );
+    site.expect("sync", 0);
+}
+
+#[test]
+fn self_update_failures_preserve_the_executable_and_clean_up_containers() {
+    let mut site = Site::new();
+    site.executable = site._temp.path().join("installed-rusthead");
+    fs::copy(env!("CARGO_BIN_EXE_rusthead"), &site.executable).unwrap();
+    let original = fs::read(&site.executable).unwrap();
+    fs::write(site._temp.path().join("fail-binary-pull"), "").unwrap();
+    site.expect("commit", 1);
+    assert_eq!(original, fs::read(&site.executable).unwrap());
+    fs::remove_file(site._temp.path().join("fail-binary-pull")).unwrap();
+    fs::write(site._temp.path().join("fail-copy"), "").unwrap();
+    site.expect("commit", 1);
+    let log = fs::read_to_string(site._temp.path().join("docker.log")).unwrap();
+    assert!(log.contains("rm --force extraction-container"));
+    fs::remove_file(site._temp.path().join("fail-copy")).unwrap();
+    fs::write(
+        site._temp.path().join("image-rusthead"),
+        "not an executable",
+    )
+    .unwrap();
+    site.expect("commit", 1);
+    assert_eq!(original, fs::read(&site.executable).unwrap());
+    assert!(!site.root.join("services").exists());
+}
+
+#[test]
+fn a_new_image_with_identical_binary_does_not_replace_and_dirty_sync_does_not_pull() {
+    use std::os::unix::fs::MetadataExt;
+    let mut site = Site::new();
+    site.executable = site._temp.path().join("installed-rusthead");
+    fs::copy(env!("CARGO_BIN_EXE_rusthead"), &site.executable).unwrap();
+    let config = fs::read_to_string(site.root.join("custom.toml")).unwrap();
+    fs::write(
+        site.root.join("custom.toml"),
+        format!("image = 'registry.example/rusthead:test'\n{config}"),
+    )
+    .unwrap();
+    site.expect("commit", 3);
+    let inode = fs::metadata(&site.executable).unwrap().ino();
+    fs::write(
+        site._temp.path().join("binary-id"),
+        "different-image-same-binary",
+    )
+    .unwrap();
+    site.expect("sync", 0);
+    assert_eq!(inode, fs::metadata(&site.executable).unwrap().ino());
+    let log = fs::read_to_string(site._temp.path().join("docker.log")).unwrap();
+    assert!(log.contains("pull --platform linux/amd64 registry.example/rusthead:test"));
+    assert!(log.contains("create --platform linux/amd64 sha256:different-image-same-binary"));
+    site.append("custom.toml", "# unfinished edit\n");
+    site.expect("sync", 1);
+    assert_eq!(
+        log,
+        fs::read_to_string(site._temp.path().join("docker.log")).unwrap()
+    );
 }

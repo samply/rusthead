@@ -25,7 +25,7 @@ pub struct Config {
     pub hostname: Host,
     #[serde(default)]
     pub environment: Environment,
-    /// Rusthead Docker image to use (defaults to "samply/rusthead:latest")
+    /// Distribution image containing the native executable (defaults to "samply/rusthead:latest")
     #[serde(default = "default_image")]
     pub image: String,
     /// Defaults to docker named volumes

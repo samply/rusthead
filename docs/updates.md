@@ -89,3 +89,61 @@ The generated systemd update service accepts status 3 as success and requests a
 restart for 3 or 4. Status 4 remains a service failure so the push problem stays
 visible. Standalone enrollment key or certificate changes are accepted with
 `update commit`; installation accepts these changes before enabling the timer.
+
+## Updating the executable
+
+Both update modes check the distribution image selected by the top-level `image`
+configuration (default `samply/rusthead:latest`). Git preflight runs first; `sync`
+also pulls configuration first, so a remote configuration can select a different
+image tag or digest. Compose and enrollment commands do not self-update.
+
+The updater pulls `linux/amd64`, inspects the immutable image ID, creates a stopped
+container, and copies `/usr/local/bin/rusthead` out. It never starts the distribution
+container. `.rusthead/binary.json` caches the image ID and executable SHA-256;
+unchanged image IDs and executable content avoid extraction, and identical binary
+content avoids replacement even when the image ID changes.
+
+A changed executable must be an x86_64 ELF file and successfully report `--version`
+before [self-replace](https://docs.rs/self-replace/latest/self_replace/) replaces
+the running executable. The new version continues the requested update with the
+same absolute configuration path and update mode; the original process returns
+its exit status. An internal handoff prevents a second binary-update check during
+that continuation. A binary replacement alone does not restart services: generated
+runtime changes still determine the restart status.
+
+`install` copies the executable to `.rusthead/bin/rusthead`, owned by the
+`bridgehead` service account, and points systemd at that managed copy. Use this
+copy for later manual commands too. Running `update` from another copy checks and
+updates that executable instead; its containing directory must be writable by the
+caller. Pull, extraction, and executable validation failures abort generation and
+leave the existing executable in place.
+
+The distribution image is `FROM scratch` and contains only the static executable.
+The host needs Git and Docker with Compose. Secret synchronization runs
+`docker.verbis.dkfz.de/cache/samply/secret-sync-local:latest` with an isolated cache
+and read-only key/certificate mounts; host `proxy` and `local` programs are no
+longer needed.
+
+## Building and testing
+
+CI builds and tests `x86_64-unknown-linux-musl`, then builds the size-optimized
+release binary. It packages the tested release artifact using Samply's reusable
+`docker-ci.yml` workflow, retaining its image-tag publishing conventions.
+
+With Rust's musl target, `musl-gcc`, Docker Compose, and cargo-nextest installed:
+
+```sh
+cargo nextest run --locked --target x86_64-unknown-linux-musl --no-fail-fast
+unshare --user --map-root-user cargo nextest run --locked --target x86_64-unknown-linux-musl --no-fail-fast --test install --run-ignored only
+cargo build --locked --release --target x86_64-unknown-linux-musl
+mkdir -p artifacts
+cp target/x86_64-unknown-linux-musl/release/rusthead artifacts/rusthead
+docker build --platform linux/amd64 -t rusthead-local .
+docker run --rm rusthead-local --version
+```
+
+CI runs root-only installer tests with `sudo`; the local command above uses an
+isolated user namespace. Self-update tests replace private executable copies and fake
+Docker transport; they never replace the developer's compiled binary. CI also
+smoke-tests the real scratch image and compares its extracted binary with the
+release artifact.

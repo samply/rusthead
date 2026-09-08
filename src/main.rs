@@ -13,6 +13,7 @@ mod enrollment;
 mod git;
 mod install;
 mod modules;
+mod self_update;
 mod services;
 mod update;
 mod update_state;
@@ -35,6 +36,7 @@ enum Subcommand {
 }
 
 #[derive(Debug, clap::Parser)]
+#[clap(version)]
 struct Args {
     #[clap(
         short,
