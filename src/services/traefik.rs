@@ -11,13 +11,13 @@ use super::Service;
 
 #[derive(Debug, Deserialize)]
 pub struct TraefikConfig {
-    tls: Option<TlsConfig>,
+    pub(crate) tls: Option<TlsConfig>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
-struct TlsConfig {
-    cert_file: PathBuf,
-    key_file: PathBuf,
+pub(crate) struct TlsConfig {
+    pub(crate) cert_file: PathBuf,
+    pub(crate) key_file: PathBuf,
 }
 
 #[derive(Debug, Template)]

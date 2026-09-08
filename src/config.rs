@@ -29,7 +29,9 @@ pub struct Config {
     pub image: String,
     /// Defaults to docker named volumes
     pub volume_dir: Option<PathBuf>,
-    pub git_sync: Option<bool>,
+    /// Explicitly enable upstream synchronization during updates.
+    #[serde(default)]
+    pub git_sync: bool,
     pub https_proxy_url: Option<Url>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
