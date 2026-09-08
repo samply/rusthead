@@ -8,7 +8,7 @@ use std::{
 use anyhow::{Context, bail, ensure};
 use duct::cmd;
 
-use crate::{config::Config, modules, services::ServiceMap};
+use crate::{config::Config, modules, services::ServiceMap, update_state::UpdateLock};
 
 fn require_root() -> anyhow::Result<()> {
     ensure!(
@@ -95,9 +95,13 @@ pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
         return Ok(ExitCode::from(status));
     }
     // Update may have changed local credentials; do not overwrite them with our earlier copy.
-    let conf = load_materialized(config)?;
-    let needs_enrollment = !conf.local_conf.borrow().pending_beam_networks().is_empty();
-    enroll_pending_networks(conf)?;
+    let needs_enrollment = {
+        let _lock = UpdateLock::acquire(&conf.path)?;
+        let conf = load_materialized(config)?;
+        let pending = !conf.pending_beam_networks().is_empty();
+        enroll_pending_networks(conf)?;
+        pending
+    };
     if needs_enrollment {
         // Accept enrollment's local inputs before the clean-only timer starts.
         let status = run_update(&executable, config, &conf.path)?;
@@ -273,6 +277,12 @@ fn install_systemd(directory: &Path, executable: &Path, config: &Path) -> anyhow
 
 pub fn enroll(config: &PathBuf) -> anyhow::Result<ExitCode> {
     require_root()?;
+    let root = if config.is_dir() {
+        config.as_path()
+    } else {
+        config.parent().context("Configuration has no parent")?
+    };
+    let _lock = UpdateLock::acquire(root)?;
     let conf = load_materialized(config)?;
     enroll_pending_networks(conf)?;
     Ok(ExitCode::SUCCESS)
@@ -280,7 +290,9 @@ pub fn enroll(config: &PathBuf) -> anyhow::Result<ExitCode> {
 
 fn enroll_pending_networks(conf: &Config) -> anyhow::Result<()> {
     conf.save_local_conf()?;
-    let networks = conf.local_conf.borrow().pending_beam_networks();
+    // Persist invalidation of old receipts when the site's private key is missing.
+    conf.enrollment.borrow().save(&conf.path)?;
+    let networks = conf.pending_beam_networks();
     if networks.is_empty() {
         println!("No Beam networks pending enrollment.");
         return Ok(());
@@ -305,11 +317,11 @@ fn enroll_pending_networks(conf: &Config) -> anyhow::Result<()> {
         fs::set_permissions(&key, fs::Permissions::from_mode(0o600))?;
         cmd!("chown", "bridgehead:docker", &key).run()?;
         {
-            let mut local = conf.local_conf.borrow_mut();
-            local.enrolled_beam_networks.insert(broker.clone());
+            let mut enrollment = conf.enrollment.borrow_mut();
+            enrollment.enrolled_beam_networks.insert(broker.clone());
         }
-        // Save each success so a failure on a later network can be retried independently.
-        conf.save_local_conf()?;
+        // Save each success independently without modifying configuration or the update baseline.
+        conf.enrollment.borrow().save(&conf.path)?;
     }
     if !networks.is_empty() {
         println!(
@@ -332,29 +344,27 @@ mod tests {
         // Older local configurations must load without losing their existing seed.
         fs::write(temp.path().join("config.local.toml"), "seed = 42\n").unwrap();
         let conf = load_materialized(&config).unwrap();
-        let networks = conf.local_conf.borrow().beam_networks.clone();
+        let networks = conf.beam_networks.borrow().clone();
         assert_eq!(networks.len(), 1);
-        assert_eq!(conf.local_conf.borrow().pending_beam_networks(), networks);
+        assert_eq!(conf.pending_beam_networks(), networks);
         fs::write(private_key(conf), "key").unwrap();
         {
-            let mut local = conf.local_conf.borrow_mut();
-            local.enrolled_beam_networks = networks.clone();
+            let mut enrollment = conf.enrollment.borrow_mut();
+            enrollment.enrolled_beam_networks = networks.clone();
         }
-        conf.save_local_conf().unwrap();
+        conf.enrollment.borrow().save(&conf.path).unwrap();
         assert!(
             load_materialized(&config)
                 .unwrap()
-                .local_conf
-                .borrow()
                 .pending_beam_networks()
                 .is_empty()
         );
 
         fs::write(&config, "site_id = 'test'\nhostname = 'localhost'\n").unwrap();
         let disabled = load_materialized(&config).unwrap();
-        assert!(disabled.local_conf.borrow().beam_networks.is_empty());
+        assert!(disabled.beam_networks.borrow().is_empty());
         assert_eq!(
-            disabled.local_conf.borrow().enrolled_beam_networks,
+            disabled.enrollment.borrow().enrolled_beam_networks,
             networks
         );
         disabled.save_local_conf().unwrap();
@@ -362,8 +372,6 @@ mod tests {
         assert!(
             load_materialized(&config)
                 .unwrap()
-                .local_conf
-                .borrow()
                 .pending_beam_networks()
                 .is_empty()
         );
@@ -374,19 +382,13 @@ mod tests {
         assert!(
             load_materialized(&config)
                 .unwrap()
-                .local_conf
-                .borrow()
                 .pending_beam_networks()
                 .is_empty()
         );
         fs::write(&config, configured).unwrap();
         fs::remove_file(private_key(conf)).unwrap();
         assert_eq!(
-            load_materialized(&config)
-                .unwrap()
-                .local_conf
-                .borrow()
-                .pending_beam_networks(),
+            load_materialized(&config).unwrap().pending_beam_networks(),
             networks
         );
     }

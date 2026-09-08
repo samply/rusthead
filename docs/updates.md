@@ -43,11 +43,22 @@ when the remote is reachable and the histories permit synchronization.
 
 ## Local state and recovery
 
-Ignored `.rusthead/` metadata stores fingerprints and an update lock. It contains
+Ignored `.rusthead/` metadata stores update fingerprints, an update lock, and a
+separate `enrollment.json` containing completed enrollment records. It contains
 no copies of secret contents and is accessible only to the installation owner
 and group. Runtime change detection includes generated files, pinned image
 versions, environment values, overrides, and certificates; a config-only commit
 need not request a restart. No-op or ignored-only changes create no empty commits.
+
+`enrollment.json` is durable operational state: resetting `state.json` must not
+remove it. Required Beam networks are derived from the configured services and
+are not persisted. The seed, credentials, and user configuration remain in
+`config.local.toml`.
+
+Enrollment saves each completed network independently. Receipt changes alone do
+not dirty update inputs; changes to actual keys or certificates still do. A missing
+site private key invalidates its enrollment records, retaining the existing
+reenrollment behavior.
 
 Generation renders all service templates before replacing service files, but the
 whole update is not a filesystem transaction: certificate creation, output
@@ -76,5 +87,5 @@ image lockfile after the override file.
 
 The generated systemd update service accepts status 3 as success and requests a
 restart for 3 or 4. Status 4 remains a service failure so the push problem stays
-visible. Standalone enrollment changes are accepted with `update commit`;
-installation accepts its enrollment changes before enabling the timer.
+visible. Standalone enrollment key or certificate changes are accepted with
+`update commit`; installation accepts these changes before enabling the timer.

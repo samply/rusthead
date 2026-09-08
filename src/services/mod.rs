@@ -234,7 +234,7 @@ impl ServiceMap {
 
     pub fn new(config: &'static Config) -> Self {
         // Rebuild configured networks while retaining enrollment history.
-        config.local_conf.borrow_mut().beam_networks.clear();
+        config.beam_networks.borrow_mut().clear();
         let mut deps = solvent::DepGraph::new();
         deps.register_node(Self::ROOT_NODE);
         Self {

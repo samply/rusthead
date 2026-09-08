@@ -85,6 +85,19 @@ if [ ! -f "$key" ]; then printf 'private key\n' > "$key"; fi
             .unwrap()
     }
 
+    fn enrolled_networks(&self) -> Vec<serde_json::Value> {
+        let value: serde_json::Value = serde_json::from_slice(
+            &fs::read(
+                self.temp
+                    .path()
+                    .join("site with spaces/.rusthead/enrollment.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        value["enrolled_beam_networks"].as_array().unwrap().clone()
+    }
+
     fn local_conf(&self) -> toml::Table {
         toml::from_str(
             &fs::read_to_string(self.temp.path().join("site with spaces/config.local.toml"))
@@ -200,8 +213,9 @@ fn new_network_is_enrolled_without_repeating_existing_enrollment() {
         String::from_utf8_lossy(&result.stderr)
     );
     let local = installation.local_conf();
-    assert_eq!(local["beam_networks"].as_array().unwrap().len(), 2);
-    assert_eq!(local["enrolled_beam_networks"].as_array().unwrap().len(), 2);
+    assert!(!local.contains_key("beam_networks"));
+    assert!(!local.contains_key("enrolled_beam_networks"));
+    assert_eq!(installation.enrolled_networks().len(), 2);
     assert_eq!(local["seed"], before["seed"]);
     assert_eq!(
         fs::read_to_string(site.join(".env")).unwrap(),
@@ -238,8 +252,9 @@ fn partial_enrollment_is_persisted_and_only_failed_networks_are_retried() {
     fs::write(root.join("fail-network"), "test.broker.ccp-it.dktk.dkfz.de").unwrap();
     assert!(!installation.run(0).status.success());
     let local = installation.local_conf();
-    assert_eq!(local["beam_networks"].as_array().unwrap().len(), 2);
-    assert_eq!(local["enrolled_beam_networks"].as_array().unwrap().len(), 1);
+    assert!(!local.contains_key("beam_networks"));
+    assert!(!local.contains_key("enrolled_beam_networks"));
+    assert_eq!(installation.enrolled_networks().len(), 1);
     fs::remove_file(root.join("fail-network")).unwrap();
     assert!(installation.run(0).status.success());
     let proxies = fs::read_to_string(root.join("proxies")).unwrap();
@@ -257,11 +272,5 @@ fn partial_enrollment_is_persisted_and_only_failed_networks_are_retried() {
             .count(),
         2
     );
-    assert_eq!(
-        installation.local_conf()["enrolled_beam_networks"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(installation.enrolled_networks().len(), 2);
 }

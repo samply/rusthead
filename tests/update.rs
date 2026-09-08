@@ -472,3 +472,27 @@ fn runtime_volume_data_is_neither_hashed_nor_committed() {
     site.expect("sync", 0);
     assert!(site.git(&["status", "--porcelain"]).is_empty());
 }
+
+#[test]
+fn enrollment_receipts_do_not_dirty_inputs_and_survive_update_baseline_reset() {
+    let site = Site::new();
+    fs::create_dir(site.root.join("pki")).unwrap();
+    fs::write(site.root.join("pki/test.priv.pem"), "existing key").unwrap();
+    site.expect("commit", 3);
+    let local = fs::read(site.root.join("config.local.toml")).unwrap();
+    let receipt = br#"{"enrolled_beam_networks":["broker.ccp-it.dktk.dkfz.de"]}"#;
+    fs::write(site.root.join(".rusthead/enrollment.json"), receipt).unwrap();
+    site.expect("sync", 0);
+    assert_eq!(
+        fs::read(site.root.join("config.local.toml")).unwrap(),
+        local
+    );
+    let saved = fs::read(site.root.join(".rusthead/enrollment.json")).unwrap();
+    fs::remove_file(site.root.join(".rusthead/state.json")).unwrap();
+    site.expect("sync", 3);
+    assert_eq!(
+        fs::read(site.root.join(".rusthead/enrollment.json")).unwrap(),
+        saved
+    );
+    assert!(!site.git(&["ls-files"]).contains("enrollment.json"));
+}
