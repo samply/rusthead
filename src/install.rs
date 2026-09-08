@@ -85,43 +85,62 @@ pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
         install_systemd(Path::new("/etc/systemd/system"), &executable, config)?;
         cmd!("systemctl", "daemon-reload").run()?;
         cmd!("systemctl", "enable", "bridgehead.service").run()?;
-        cmd!("systemctl", "enable", "--now", "bridgehead-update.timer").run()?;
     } else {
         println!(
             "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
         );
-        let status = cmd!(
-            "sudo",
-            "-u",
-            "bridgehead",
-            &executable,
-            "--config",
-            config,
-            "update"
-        )
-        .dir(&conf.path)
-        .unchecked()
-        .run()
-        .context("Failed to run bridgehead update")?
-        .status;
-        match status.code() {
-            Some(0 | 3) => {}
-            Some(code) => {
-                eprintln!("Failed to update bridgehead");
-                return Ok(ExitCode::from(u8::try_from(code)?));
-            }
-            None => bail!("Bridgehead update was killed by a signal"),
-        }
+    }
+    let status = run_update(&executable, config, &conf.path)?;
+    if !matches!(status, 0 | 3) {
+        return Ok(ExitCode::from(status));
     }
     // Update may have changed local credentials; do not overwrite them with our earlier copy.
     let conf = load_materialized(config)?;
+    let needs_enrollment = !conf.local_conf.borrow().pending_beam_networks().is_empty();
     enroll_pending_networks(conf)?;
+    if needs_enrollment {
+        // Accept enrollment's local inputs before the clean-only timer starts.
+        let status = run_update(&executable, config, &conf.path)?;
+        if !matches!(status, 0 | 3) {
+            return Ok(ExitCode::from(status));
+        }
+    }
+    if systemd {
+        cmd!("systemctl", "enable", "--now", "bridgehead-update.timer").run()?;
+    }
     println!("Installation complete.");
     println!(
         "Start with 'systemctl start bridgehead' or 'rusthead --config {} compose up'.",
         config.display()
     );
     Ok(ExitCode::SUCCESS)
+}
+
+fn run_update(executable: &Path, config: &Path, directory: &Path) -> anyhow::Result<u8> {
+    let status = cmd!(
+        "sudo",
+        "-u",
+        "bridgehead",
+        executable,
+        "--config",
+        config,
+        "update",
+        "commit"
+    )
+    .dir(directory)
+    .unchecked()
+    .run()
+    .context("Failed to run bridgehead update")?
+    .status;
+    match status.code() {
+        Some(code) => {
+            if !matches!(code, 0 | 3) {
+                eprintln!("Failed to update bridgehead");
+            }
+            Ok(u8::try_from(code)?)
+        }
+        None => bail!("Bridgehead update was killed by a signal"),
+    }
 }
 
 fn private_key(conf: &Config) -> PathBuf {
@@ -177,9 +196,18 @@ fn configure_git(conf: &Config) -> anyhow::Result<()> {
         ("user.email", "bridgehead@samply.de"),
         ("user.name", "Bridgehead"),
     ] {
-        cmd!("git", "config", "--local", "--replace-all", key, value)
+        if !cmd!("git", "config", "--get", key)
             .dir(&conf.path)
-            .run()?;
+            .stdout_null()
+            .unchecked()
+            .run()?
+            .status
+            .success()
+        {
+            cmd!("git", "config", "--local", key, value)
+                .dir(&conf.path)
+                .run()?;
+        }
     }
     for key in ["http.proxy", "https.proxy"] {
         if let Some(proxy) = &conf.https_proxy_url {
@@ -229,7 +257,7 @@ fn install_systemd(directory: &Path, executable: &Path, config: &Path) -> anyhow
     let command = format!("{} --config {}", unit_arg(executable)?, unit_arg(config)?);
     let units = [
         ("bridgehead.service", format!("[Unit]\nDescription=Bridgehead Service\nRequires=docker.service\n\n[Service]\nExecStart={command} compose up --abort-on-container-exit\nRestart=always\nUser=bridgehead\nGroup=docker\n\n[Install]\nWantedBy=multi-user.target\n")),
-        ("bridgehead-update.service", format!("[Unit]\nDescription=Bridgehead Update Service\nRequires=docker.service\n\n[Service]\nExecStart={command} update\nUser=bridgehead\nGroup=docker\nExecStopPost=+/bin/bash -c 'if [ \"$$EXIT_STATUS\" = \"3\" ]; then systemctl restart bridgehead.service; fi'\n")),
+        ("bridgehead-update.service", format!("[Unit]\nDescription=Bridgehead Update Service\nRequires=docker.service\n\n[Service]\nExecStart={command} update sync\nSuccessExitStatus=3\nUser=bridgehead\nGroup=docker\nExecStopPost=+/bin/bash -c 'if [ \"$$EXIT_STATUS\" = \"3\" ] || [ \"$$EXIT_STATUS\" = \"4\" ]; then systemctl restart bridgehead.service; fi'\n")),
         ("bridgehead-update.timer", "[Unit]\nDescription=Daily Updates at 6am of Bridgehead\n\n[Timer]\nOnCalendar=*-*-* 06:00:00\nPersistent=true\n\n[Install]\nWantedBy=basic.target\n".into()),
     ];
     fs::create_dir_all(directory)?;
@@ -382,6 +410,10 @@ mod tests {
                 .unwrap()
                 .contains("$$EXIT_STATUS")
         );
+        let update_unit =
+            fs::read_to_string(temp.path().join("bridgehead-update.service")).unwrap();
+        assert!(update_unit.contains(" update sync\nSuccessExitStatus=3\n"));
+        assert!(update_unit.contains("= \"4\""));
         assert!(
             fs::read_to_string(temp.path().join("bridgehead-update.timer"))
                 .unwrap()
