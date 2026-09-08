@@ -3,10 +3,9 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     fs,
-    process::Command,
 };
 
-use anyhow::bail;
+use anyhow::{Context, bail};
 use url::{Host, Url};
 
 use crate::config::{Config, LocalConf};
@@ -118,22 +117,9 @@ impl<T: OidcProvider> SyncOidc for OidcClient<T> {
         if secret_sync_defs.is_empty() {
             bail!("No secrets to sync")
         }
-        let temp_dir = std::env::temp_dir();
-        let root_cert_file = temp_dir.join(format!("{}.pem", T::BeamProvider::network_name()));
+        let temp_dir = tempfile::tempdir().context("Failed to create secret-sync directory")?;
+        let root_cert_file = temp_dir.path().join("root.crt.pem");
         fs::write(&root_cert_file, T::BeamProvider::root_cert())?;
-        let mut beam_proxy_conf = Command::new("proxy");
-        beam_proxy_conf
-            .env("RUST_LOG", "warn")
-            .env("PRIVKEY_FILE", &self.beam_proxy.priv_key)
-            .env("ROOTCERT_FILE", root_cert_file)
-            .env("BROKER_URL", T::BeamProvider::broker_url().as_str())
-            .env("PROXY_ID", &self.beam_proxy.proxy_id)
-            .env("TLS_CA_CERTIFICATES_DIR", &self.beam_proxy.trusted_ca_certs)
-            .env("APP_secret-sync_KEY", "NotSecret");
-        if let Some(http_proxy) = &self.http_proxy_url {
-            beam_proxy_conf.env("ALL_PROXY", http_proxy.as_str());
-        }
-        let mut beam_proxy = beam_proxy_conf.spawn()?;
         let cached_data = self
             .local_conf
             .borrow()
@@ -143,16 +129,21 @@ impl<T: OidcProvider> SyncOidc for OidcClient<T> {
             .map(|(k, v)| format!("{k}=\"{v}\""))
             .collect::<Vec<_>>()
             .join("\n");
-        let cache_path = temp_dir.join("cache");
+        let cache_path = temp_dir.path().join("cache");
         fs::write(&cache_path, cached_data)?;
-        let mut secret_sync = Command::new("local")
-            .env("PROXY_ID", &self.beam_proxy.proxy_id)
-            .env("OIDC_PROVIDER", T::oidc_provider_id())
-            .env("SECRET_DEFINITIONS", secret_sync_defs.join("\x1E"))
-            .env("CACHE_PATH", &cache_path)
-            .spawn()?;
-        secret_sync.wait()?;
-        beam_proxy.kill()?;
+        secret_sync_command(
+            &cache_path,
+            &self.beam_proxy.priv_key,
+            &root_cert_file,
+            &self.beam_proxy.trusted_ca_certs,
+            &self.beam_proxy.proxy_id,
+            T::BeamProvider::broker_url().as_str(),
+            &T::oidc_provider_id(),
+            &secret_sync_defs.join("\x1E"),
+            self.http_proxy_url.as_ref().map(Url::as_str),
+        )?
+        .run()
+        .context("Secret-sync container failed")?;
         let out = fs::read_to_string(cache_path)?;
         let new_cache = out
             .lines()
@@ -173,6 +164,71 @@ impl<T: OidcProvider> SyncOidc for OidcClient<T> {
     fn get_local_conf(&self) -> &'static RefCell<LocalConf> {
         self.local_conf
     }
+}
+
+// The image starts both the Beam proxy and the local secret-sync client.
+#[allow(clippy::too_many_arguments)]
+fn secret_sync_command(
+    cache: &std::path::Path,
+    key: &std::path::Path,
+    root_cert: &std::path::Path,
+    trusted_certs: &std::path::Path,
+    proxy_id: &str,
+    broker_url: &str,
+    provider: &str,
+    definitions: &str,
+    http_proxy: Option<&str>,
+) -> anyhow::Result<duct::Expression> {
+    // Docker owns the container lifecycle, including failure cleanup. The temporary
+    // cache is mounted read/write; keys and trust material are always read-only.
+    let mut args = vec!["run".to_owned(), "--rm".to_owned()];
+    for (source, target, readonly) in [
+        (cache, "/usr/local/cache", false),
+        (key, "/run/secrets/privkey.pem", true),
+        (root_cert, "/run/secrets/root.crt.pem", true),
+        (trusted_certs, "/conf/trusted-ca-certs", true),
+    ] {
+        let source = source
+            .canonicalize()
+            .with_context(|| format!("Cannot mount {} for secret-sync", source.display()))?;
+        args.extend([
+            "-v".to_owned(),
+            format!(
+                "{}:{target}{}",
+                source.display(),
+                if readonly { ":ro" } else { "" }
+            ),
+        ]);
+    }
+    let mut command = duct::cmd("docker", {
+        for name in [
+            "TLS_CA_CERTIFICATES_DIR",
+            "NO_PROXY",
+            "ALL_PROXY",
+            "PROXY_ID",
+            "BROKER_URL",
+            "OIDC_PROVIDER",
+            "SECRET_DEFINITIONS",
+            "CACHE_PATH",
+        ] {
+            args.extend(["-e".to_owned(), name.to_owned()]);
+        }
+        args.push("docker.verbis.dkfz.de/cache/samply/secret-sync-local:latest".to_owned());
+        args
+    });
+    for (name, value) in [
+        ("TLS_CA_CERTIFICATES_DIR", "/conf/trusted-ca-certs"),
+        ("NO_PROXY", "localhost,127.0.0.1"),
+        ("ALL_PROXY", http_proxy.unwrap_or("")),
+        ("PROXY_ID", proxy_id),
+        ("BROKER_URL", broker_url),
+        ("OIDC_PROVIDER", provider),
+        ("SECRET_DEFINITIONS", definitions),
+        ("CACHE_PATH", "/usr/local/cache"),
+    ] {
+        command = command.env(name, value);
+    }
+    Ok(command)
 }
 
 fn evaluate(provider: TypeId) -> &'static RefCell<LocalConf> {
@@ -252,4 +308,64 @@ pub trait OidcProvider: 'static {
     fn private_issuer_url(_private_client_id: &str) -> Url;
 
     fn admin_group(conf: &Config) -> String;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn secret_sync_runs_the_container_with_isolated_cache_and_readonly_keys() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        for name in ["cache", "key", "root-cert"] {
+            fs::write(root.join(name), "existing").unwrap();
+        }
+        fs::create_dir(root.join("trusted")).unwrap();
+        fs::write(root.join("docker"), r#"#!/bin/sh
+set -eu
+printf '%s\n' "$@" > "$TEST_ROOT/args"
+printf '%s\n' "$PROXY_ID" "$BROKER_URL" "$OIDC_PROVIDER" "$SECRET_DEFINITIONS" "$ALL_PROXY" "$NO_PROXY" "$CACHE_PATH" > "$TEST_ROOT/env"
+printf 'client="new-secret"\n' > "$TEST_ROOT/cache"
+exit "${TEST_EXIT:-0}"
+"#).unwrap();
+        fs::set_permissions(root.join("docker"), fs::Permissions::from_mode(0o755)).unwrap();
+        let command = secret_sync_command(
+            &root.join("cache"),
+            &root.join("key"),
+            &root.join("root-cert"),
+            &root.join("trusted"),
+            "site.broker",
+            "https://broker",
+            "provider",
+            "OIDC:client:private;https://site",
+            Some("http://proxy"),
+        )
+        .unwrap()
+        .env(
+            "PATH",
+            format!("{}:{}", root.display(), std::env::var("PATH").unwrap()),
+        )
+        .env("TEST_ROOT", root);
+        command.run().unwrap();
+        let args = fs::read_to_string(root.join("args")).unwrap();
+        assert!(args.starts_with("run\n--rm\n"));
+        assert!(args.contains("/run/secrets/privkey.pem:ro"));
+        assert!(args.contains("/run/secrets/root.crt.pem:ro"));
+        assert!(args.contains("/conf/trusted-ca-certs:ro"));
+        assert!(args.contains("/usr/local/cache\n"));
+        assert!(args.contains("secret-sync-local:latest"));
+        assert!(
+            fs::read_to_string(root.join("env"))
+                .unwrap()
+                .contains("http://proxy\nlocalhost,127.0.0.1\n/usr/local/cache")
+        );
+        assert!(
+            fs::read_to_string(root.join("cache"))
+                .unwrap()
+                .contains("new-secret")
+        );
+        assert!(command.env("TEST_EXIT", "9").run().is_err());
+    }
 }

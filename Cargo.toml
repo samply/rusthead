@@ -22,11 +22,18 @@ sha2 = "0.10"
 libc = "0.2"
 solvent = "0.8.3"
 duct = "1.1.2"
+self-replace = "1.5"
+tempfile = "3.27"
 
 [dev-dependencies]
 insta = { version = "1.47", features = ["filters", "glob", "toml"] }
-tempfile = "3.27"
 toml = { version = "*", features = ["preserve_order"] }
 
 [profile.dev]
 strip = "debuginfo"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

@@ -70,6 +70,7 @@ pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
     .run()
     .context("Failed to initialize shared Git repository")?;
     configure_git(conf)?;
+    let executable = install_binary(conf, &executable)?;
 
     let systemd = match cmd!("systemctl", "status", "docker")
         .stdout_null()
@@ -118,6 +119,20 @@ pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
         config.display()
     );
     Ok(ExitCode::SUCCESS)
+}
+
+fn install_binary(conf: &Config, source: &Path) -> anyhow::Result<PathBuf> {
+    let directory = crate::update_state::prepare_directory(&conf.path)?.join("bin");
+    fs::create_dir_all(&directory)?;
+    let destination = directory.join("rusthead");
+    if source != destination {
+        let temporary = directory.join("rusthead.tmp");
+        fs::copy(source, &temporary).context("Failed to copy the managed executable")?;
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o755))?;
+        fs::rename(temporary, &destination)?;
+    }
+    cmd!("chown", "-R", "-h", "bridgehead:docker", &directory).run()?;
+    Ok(destination)
 }
 
 fn run_update(executable: &Path, config: &Path, directory: &Path) -> anyhow::Result<u8> {
