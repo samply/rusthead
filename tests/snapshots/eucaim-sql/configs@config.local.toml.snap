@@ -5,5 +5,3 @@ info: config.local.toml
 input_file: tests/configs/eucaim-sql.toml
 ---
 seed = 42
-beam_networks = ['broker.eucaim.cancerimage.eu']
-enrolled_beam_networks = []

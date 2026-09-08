@@ -35,29 +35,47 @@ pub struct UpdateLock {
 }
 impl UpdateLock {
     pub fn acquire(root: &Path) -> anyhow::Result<Self> {
-        let dir = root.join(".rusthead");
-        if dir.exists() {
-            ensure!(
-                !fs::symlink_metadata(&dir)?.file_type().is_symlink(),
-                ".rusthead must not be a symlink"
-            );
-        }
-        fs::create_dir_all(&dir)?;
-        fs::set_permissions(&dir, fs::Permissions::from_mode(0o2770))?;
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .mode(0o660)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(dir.join("update.lock"))?;
+        let dir = prepare_directory(root)?;
+        let open_lock = |create| {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create_new(create)
+                .mode(0o660)
+                .custom_flags(libc::O_NOFOLLOW)
+                .open(dir.join("update.lock"))
+        };
+        let file = match open_lock(true) {
+            Ok(file) => {
+                file.set_permissions(fs::Permissions::from_mode(0o660))?;
+                file
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => open_lock(false)?,
+            Err(e) => return Err(e.into()),
+        };
         ensure!(
             unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
             "Another update is running (or the update lock could not be acquired)"
         );
         Ok(Self { _file: file })
     }
+}
+
+/// Shared private metadata directory; enrollment receipts outlive update baselines.
+pub(crate) fn prepare_directory(root: &Path) -> anyhow::Result<PathBuf> {
+    let dir = root.join(".rusthead");
+    match fs::create_dir(&dir) {
+        Ok(()) => fs::set_permissions(&dir, fs::Permissions::from_mode(0o2770))?,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            ensure!(
+                fs::symlink_metadata(&dir)?.is_dir(),
+                ".rusthead must be a directory, not a symlink"
+            );
+            // The other installation user may own this shared directory.
+        }
+        Err(e) => return Err(e.into()),
+    }
+    Ok(dir)
 }
 
 impl State {

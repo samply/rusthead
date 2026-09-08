@@ -58,10 +58,7 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
     type ServiceConfig = &'static Config;
 
     fn from_config(conf: Self::ServiceConfig, (fw_proxy,): Deps<Self>) -> Self {
-        conf.local_conf
-            .borrow_mut()
-            .beam_networks
-            .insert(T::broker_id());
+        conf.beam_networks.borrow_mut().insert(T::broker_id());
         fs::create_dir_all(conf.path.join("pki")).unwrap();
         BeamProxy {
             broker_provider: PhantomData,

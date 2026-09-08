@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
 use crate::{
+    enrollment::Enrollment,
     modules::{BbmriConfig, CcpConfig, DnpmConfig, EucaimConfig},
     services::{BasicAuthUser, Service, TraefikConfig},
 };
@@ -44,6 +45,11 @@ pub struct Config {
 
     #[serde(skip)]
     pub local_conf: RefCell<LocalConf>,
+    /// Computed while materializing configured services; never persisted.
+    #[serde(skip)]
+    pub beam_networks: RefCell<BTreeSet<String>>,
+    #[serde(skip)]
+    pub enrollment: RefCell<Enrollment>,
 }
 
 fn default_image() -> String {
@@ -72,19 +78,21 @@ impl Config {
         };
         let mut conf: Config = toml::from_str(&std::fs::read_to_string(&file)?)?;
         conf.path = file.parent().unwrap().to_path_buf();
-        let mut local_conf: LocalConf = match fs::read_to_string(conf.local_conf_path()) {
+        let local_conf: LocalConf = match fs::read_to_string(conf.local_conf_path()) {
             Ok(data) => toml::from_str(&data).context("Failed to parse config.local.toml")?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => LocalConf::default(),
             Err(error) => return Err(error).context("Failed to read config.local.toml"),
         };
+        let mut enrollment = Enrollment::load(&conf.path)?;
         if !conf
             .path
             .join(format!("pki/{}.priv.pem", conf.site_id))
             .try_exists()?
         {
-            local_conf.enrolled_beam_networks.clear();
+            enrollment.enrolled_beam_networks.clear();
         }
         conf.local_conf = RefCell::new(local_conf);
+        conf.enrollment = RefCell::new(enrollment);
         Ok(conf)
     }
 
@@ -107,10 +115,29 @@ impl Config {
         Ok(())
     }
 
-    /// Persist enrollment progress without rewriting the generated environment.
+    pub fn pending_beam_networks(&self) -> BTreeSet<String> {
+        self.beam_networks
+            .borrow()
+            .difference(&self.enrollment.borrow().enrolled_beam_networks)
+            .cloned()
+            .collect()
+    }
+
+    /// Persist local configuration without rewriting the generated environment.
     pub fn save_local_conf(&self) -> anyhow::Result<()> {
         let conf_str = toml::to_string_pretty(self.local_conf.borrow().deref())?;
-        fs::write(self.local_conf_path(), conf_str)?;
+        // Enrollment alone must not rewrite local configuration (including comments).
+        let unchanged = match fs::read_to_string(self.local_conf_path()) {
+            Ok(existing) => {
+                toml::from_str::<toml::Value>(&existing).ok()
+                    == Some(toml::from_str::<toml::Value>(&conf_str)?)
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+            Err(e) => return Err(e.into()),
+        };
+        if !unchanged {
+            fs::write(self.local_conf_path(), conf_str)?;
+        }
         Ok(())
     }
 }
@@ -122,13 +149,6 @@ pub struct LocalConf {
     seed: u32,
     pub oidc: Option<BTreeMap<String, String>>,
     pub basic_auth_users: Option<BTreeMap<String, BasicAuthUser>>,
-    /// Networks required by the current service configuration.
-    #[serde(default)]
-    pub beam_networks: BTreeSet<String>,
-    /// Networks for which the local enrollment command completed successfully.
-    /// Retained when a network is disabled so re-enabling it does not re-enroll it.
-    #[serde(default)]
-    pub enrolled_beam_networks: BTreeSet<String>,
     #[serde(skip)]
     pub generated_secrets: BTreeMap<String, String>,
 }
@@ -143,21 +163,12 @@ impl Default for LocalConf {
             seed: generate_seed(),
             oidc: None,
             basic_auth_users: None,
-            beam_networks: Default::default(),
-            enrolled_beam_networks: Default::default(),
             generated_secrets: Default::default(),
         }
     }
 }
 
 impl LocalConf {
-    pub fn pending_beam_networks(&self) -> BTreeSet<String> {
-        self.beam_networks
-            .difference(&self.enrolled_beam_networks)
-            .cloned()
-            .collect()
-    }
-
     #[must_use]
     pub fn generate_secret<const N: usize, T: Service>(&mut self, name: &str) -> String {
         let name = format!(
@@ -200,6 +211,66 @@ mod tests {
     use super::*;
 
     #[test]
+    fn enrollment_state_preserves_configuration_and_survives_baseline_reset() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(
+            temp.path().join("config.toml"),
+            "site_id = 'test'\nhostname = 'localhost'\n",
+        )
+        .unwrap();
+        fs::create_dir(temp.path().join("pki")).unwrap();
+        fs::write(temp.path().join("pki/test.priv.pem"), "existing key").unwrap();
+        let local = "# preserve operator comments\nseed = 42\n[oidc]\nclient = 'credential'\n[basic_auth_users.admin]\nhash = 'existing hash'\npw = 'existing password'\n";
+        fs::write(temp.path().join("config.local.toml"), local).unwrap();
+        let conf = Config::load(&temp.path().to_owned()).unwrap();
+        assert!(conf.beam_networks.borrow().is_empty());
+        assert!(!Enrollment::path(temp.path()).exists()); // Loading alone is read-only.
+        conf.enrollment
+            .borrow_mut()
+            .enrolled_beam_networks
+            .insert("completed.example".to_owned());
+        conf.enrollment.borrow().save(temp.path()).unwrap();
+        conf.save_local_conf().unwrap();
+        assert_eq!(fs::read_to_string(conf.local_conf_path()).unwrap(), local);
+        let receipt = fs::read(Enrollment::path(temp.path())).unwrap();
+        fs::write(temp.path().join(".rusthead/state.json"), "{}").unwrap();
+        fs::remove_file(temp.path().join(".rusthead/state.json")).unwrap();
+        let reloaded = Config::load(&temp.path().to_owned()).unwrap();
+        assert!(
+            reloaded
+                .enrollment
+                .borrow()
+                .enrolled_beam_networks
+                .contains("completed.example")
+        );
+        reloaded.save_local_conf().unwrap();
+        assert_eq!(receipt, fs::read(Enrollment::path(temp.path())).unwrap());
+        fs::remove_file(temp.path().join("pki/test.priv.pem")).unwrap();
+        let missing = Config::load(&temp.path().to_owned()).unwrap();
+        assert!(
+            missing
+                .enrollment
+                .borrow()
+                .enrolled_beam_networks
+                .is_empty()
+        );
+        missing.enrollment.borrow().save(temp.path()).unwrap();
+        missing.save_local_conf().unwrap();
+        assert_eq!(fs::read_to_string(conf.local_conf_path()).unwrap(), local);
+        fs::write(temp.path().join("pki/test.priv.pem"), "replacement key").unwrap();
+        assert!(
+            Config::load(&temp.path().to_owned())
+                .unwrap()
+                .enrollment
+                .borrow()
+                .enrolled_beam_networks
+                .is_empty()
+        );
+        fs::write(Enrollment::path(temp.path()), "invalid json").unwrap();
+        assert!(Config::load(&temp.path().to_owned()).is_err());
+    }
+
+    #[test]
     fn test_configs() {
         let mut s = insta::Settings::clone_current();
         s.set_prepend_module_to_snapshot(false);
@@ -215,7 +286,7 @@ mod tests {
                 .iter()
                 .for_each(|&m| services.install_module(m));
             services.write_all().unwrap();
-            let has_beam_networks = !conf.local_conf.borrow().beam_networks.is_empty();
+            let has_beam_networks = !conf.beam_networks.borrow().is_empty();
             let has_services = services.len() > 0;
             let tmp_dir_path = temp_dir.path().display().to_string();
             let filters = [(tmp_dir_path.as_str(), "[TMP_DIR]")];

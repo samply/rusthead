@@ -9,6 +9,7 @@ use config::Config;
 use duct::cmd;
 
 mod config;
+mod enrollment;
 mod git;
 mod install;
 mod modules;

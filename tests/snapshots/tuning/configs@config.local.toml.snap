@@ -5,8 +5,6 @@ info: config.local.toml
 input_file: tests/configs/tuning.toml
 ---
 seed = 42
-beam_networks = ['broker.ccp-it.dktk.dkfz.de']
-enrolled_beam_networks = []
 [basic_auth_users.ccp-blaze]
 hash = '<hash>'
 pw = 'test'
