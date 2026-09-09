@@ -29,7 +29,7 @@ build:
   cp {{ quote(BINARY) }} artifacts/rusthead
   docker build --platform linux/amd64 -t "$IMAGE" .
 
-# Create an editable local configuration without overwriting existing settings.
-bootstrap:
-  if [ ! -e {{ quote(CONFIG_FILE) }} ]; then mkdir -p {{ quote(parent_directory(CONFIG_FILE)) }}; printf 'site_id = "local"\nhostname = "localhost"\nimage = "%s"\n' "$IMAGE" > {{ quote(CONFIG_FILE) }}; fi
+# Run interactive bootstrap against the local image when configuration is missing.
+bootstrap: build
+  if [ ! -e {{ quote(CONFIG_FILE) }} ]; then BRIDGEHEAD_CONFIG_PATH={{ quote(CONFIG_FILE) }} BOOTSTRAP_SKIP_PULL=1 bash static/bootstrap.sh; fi
   @echo "Local configuration: "{{ quote(CONFIG_FILE) }}" (edit it to enable modules)."

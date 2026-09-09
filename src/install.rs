@@ -115,10 +115,6 @@ pub fn install(config: &PathBuf, no_self_update: bool) -> anyhow::Result<ExitCod
             return Ok(ExitCode::from(status));
         }
     }
-    let bin_dir = std::env::var_os("BRIDGEHEAD_BIN_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/usr/local/bin"));
-    install_launcher(&executable, &bin_dir)?;
     if systemd {
         cmd!("systemctl", "enable", "--now", "bridgehead-update.timer").run()?;
     }
@@ -142,31 +138,6 @@ fn install_binary(conf: &Config, source: &Path) -> anyhow::Result<PathBuf> {
     }
     cmd!("chown", "-R", "-h", "bridgehead:docker", &directory).run()?;
     Ok(destination)
-}
-
-/// Publish a PATH entry without making its directory writable by the service user.
-fn install_launcher(executable: &Path, bin_dir: &Path) -> anyhow::Result<()> {
-    let executable = executable
-        .canonicalize()
-        .context("Cannot resolve managed executable")?;
-    fs::create_dir_all(bin_dir).with_context(|| format!("Cannot create {}", bin_dir.display()))?;
-    let launcher = bin_dir.canonicalize()?.join("rusthead");
-    ensure!(
-        launcher != executable,
-        "The launcher directory must differ from the managed binary directory"
-    );
-    if fs::read_link(&launcher).ok().as_ref() == Some(&executable) {
-        return Ok(());
-    }
-    // Rename replaces an old binary or symlink, without following an old link's target.
-    let temp = tempfile::Builder::new()
-        .prefix(".rusthead-link-")
-        .tempdir_in(bin_dir)?;
-    let link = temp.path().join("rusthead");
-    std::os::unix::fs::symlink(&executable, &link)?;
-    fs::rename(link, &launcher)
-        .with_context(|| format!("Cannot install launcher {}", launcher.display()))?;
-    Ok(())
 }
 
 fn run_update(
@@ -490,34 +461,6 @@ mod tests {
             "\"/srv/50%%/$$site\""
         );
         assert!(unit_arg(Path::new("/srv/line\nbreak")).is_err());
-    }
-
-    #[test]
-    fn launcher_replaces_old_binary_and_links_without_touching_their_targets() {
-        use std::os::unix::fs::{MetadataExt, symlink};
-        let temp = tempfile::tempdir().unwrap();
-        let bin = temp.path().join("bin");
-        fs::create_dir(&bin).unwrap();
-        let managed = temp.path().join("managed");
-        fs::write(&managed, "new binary").unwrap();
-        let launcher = bin.join("rusthead");
-        fs::write(&launcher, "old binary").unwrap();
-        install_launcher(&managed, &bin).unwrap();
-        assert_eq!(fs::read_link(&launcher).unwrap(), managed);
-        let inode = fs::symlink_metadata(&launcher).unwrap().ino();
-        install_launcher(&managed, &bin).unwrap();
-        assert_eq!(inode, fs::symlink_metadata(&launcher).unwrap().ino());
-        fs::remove_file(&launcher).unwrap();
-        let other = temp.path().join("other");
-        fs::write(&other, "keep this binary").unwrap();
-        symlink(&other, &launcher).unwrap();
-        install_launcher(&managed, &bin).unwrap();
-        assert_eq!(fs::read_link(&launcher).unwrap(), managed);
-        assert_eq!(fs::read_to_string(other).unwrap(), "keep this binary");
-        fs::remove_file(&launcher).unwrap();
-        symlink(temp.path().join("missing"), &launcher).unwrap();
-        install_launcher(&managed, &bin).unwrap();
-        assert_eq!(fs::read_link(&launcher).unwrap(), managed);
     }
 
     #[test]
