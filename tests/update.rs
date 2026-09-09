@@ -58,7 +58,7 @@ esac
         }
     }
     fn command(&self, args: &[&str]) -> duct::Expression {
-        duct::cmd(&self.executable, args)
+        duct::cmd(self.executable.as_os_str(), args)
             .dir(&self.root)
             .env(
                 "PATH",
@@ -625,4 +625,54 @@ fn a_new_image_with_identical_binary_does_not_replace_and_dirty_sync_does_not_pu
         log,
         fs::read_to_string(site._temp.path().join("docker.log")).unwrap()
     );
+}
+
+#[test]
+fn development_updates_skip_binary_download_but_still_update_services() {
+    let site = Site::new();
+    fs::write(site._temp.path().join("fail-binary-pull"), "").unwrap();
+    let output = site
+        .command(&[
+            "--config",
+            "custom.toml",
+            "--no-self-update",
+            "update",
+            "commit",
+        ])
+        .run()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(3),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let log = fs::read_to_string(site._temp.path().join("docker.log")).unwrap();
+    assert!(!log.lines().any(|line| line.starts_with("pull --platform")));
+    assert!(
+        log.lines()
+            .any(|line| line.starts_with("compose ") && line.contains("pull --quiet"))
+    );
+}
+
+#[test]
+fn self_update_through_path_preserves_launcher_and_replaces_managed_binary() {
+    use std::{io::Write, os::unix::fs::symlink};
+    let mut site = Site::new();
+    let managed = site._temp.path().join("managed-rusthead");
+    fs::copy(env!("CARGO_BIN_EXE_rusthead"), &managed).unwrap();
+    let launcher = site.bin.join("rusthead");
+    symlink(&managed, &launcher).unwrap();
+    site.executable = "rusthead".into(); // Resolve the symlink through this site's PATH.
+    let image = site._temp.path().join("image-rusthead");
+    fs::OpenOptions::new()
+        .append(true)
+        .open(&image)
+        .unwrap()
+        .write_all(b"updated through PATH")
+        .unwrap();
+    site.expect("commit", 3);
+    assert_eq!(fs::read_link(&launcher).unwrap(), managed);
+    assert_eq!(fs::read(&managed).unwrap(), fs::read(image).unwrap());
+    site.expect("sync", 0);
 }
