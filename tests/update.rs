@@ -45,7 +45,6 @@ case " $* " in
     ;;
   *' pull '*)
     test ! -f "$TEST_SITE/fail-pull"
-    if test -f "$TEST_SITE/edit-during-pull"; then echo '# concurrent edit' >> "$TEST_SITE/site with spaces/custom.toml"; fi
     ;;
 esac
 "#).unwrap();
@@ -332,7 +331,7 @@ fn explicit_sync_opt_in_and_missing_upstream() {
 }
 
 #[test]
-fn concurrent_input_edits_and_update_lock() {
+fn update_lock_rejects_another_update() {
     use std::os::fd::AsRawFd;
     let site = Site::new();
     site.expect("commit", 3);
@@ -346,15 +345,7 @@ fn concurrent_input_edits_and_update_lock() {
     );
     assert!(String::from_utf8_lossy(&site.expect("sync", 1).stderr).contains("Another update"));
     drop(file);
-    let head = site.head();
-    fs::write(site._temp.path().join("edit-during-pull"), "").unwrap();
-    site.expect("sync", 1);
-    assert_eq!(head, site.head());
-    assert!(
-        fs::read_to_string(site.root.join("custom.toml"))
-            .unwrap()
-            .contains("concurrent edit")
-    );
+    site.expect("sync", 0);
 }
 
 #[test]
@@ -420,13 +411,17 @@ fn ignored_runtime_changes_restart_without_empty_commits() {
     let site = Site::new();
     site.expect("commit", 3);
     let head = site.head();
-    fs::write(site.root.join("pki/runtime.pem"), "certificate").unwrap();
+    fs::write(
+        site.root.join("trusted-ca-certs/runtime.pem"),
+        "certificate",
+    )
+    .unwrap();
     site.expect("sync", 1);
     site.expect("commit", 3);
     assert_eq!(head, site.head());
     assert!(!site.git(&["ls-files"]).contains("runtime.pem"));
     site.expect("sync", 0);
-    fs::remove_file(site.root.join("pki/runtime.pem")).unwrap();
+    fs::remove_file(site.root.join("trusted-ca-certs/runtime.pem")).unwrap();
     site.expect("sync", 1);
     site.expect("commit", 3);
     assert_eq!(head, site.head());

@@ -1,7 +1,6 @@
 //! Git history and transport. Generation and runtime change detection live elsewhere.
 use anyhow::{Context, ensure};
 use std::{
-    ffi::OsString,
     path::{Path, PathBuf},
     process::Output,
 };
@@ -88,13 +87,6 @@ impl Repository {
             .status
             .success())
     }
-    pub fn head(&self) -> anyhow::Result<Vec<u8>> {
-        if self.has_head()? {
-            self.run(&["rev-parse", "HEAD"])
-        } else {
-            Ok(Vec::new())
-        }
-    }
     pub fn ensure_idle(&self) -> anyhow::Result<()> {
         for marker in [
             "MERGE_HEAD",
@@ -159,27 +151,6 @@ impl Repository {
                 "docker-image.lock.yml",
             ])?
             .is_empty())
-    }
-    pub fn input_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
-        use std::os::unix::ffi::OsStringExt;
-        let files = self.run(&[
-            "ls-files",
-            "-z",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-        ])?;
-        Ok(files
-            .split(|b| *b == 0)
-            .filter(|p| !p.is_empty())
-            .map(|p| PathBuf::from(OsString::from_vec(p.to_vec())))
-            .filter(|p| {
-                !p.starts_with("services")
-                    && !p.starts_with(".rusthead")
-                    && p != Path::new("docker-image.lock.yml")
-                    && p != Path::new(".env")
-            })
-            .collect())
     }
     pub fn upstream(&self) -> anyhow::Result<(String, String)> {
         let branch = self

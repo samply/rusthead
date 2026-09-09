@@ -16,7 +16,7 @@ Manual generated-file edits are rejected and preserved.
 
 `update sync` requires a clean repository and unchanged local inputs. It is the
 command used by the daily timer. Pending edits to ignored configuration,
-certificates, keys, or overrides require an explicit `update commit` too. The
+public trust certificates, or overrides require an explicit `update commit` too. The
 first update initializes a shared local Git repository and accepts the existing
 inputs. An existing repository must be rooted at the installation directory;
 worktrees are supported. A configured `volume_dir` inside the installation is
@@ -46,8 +46,12 @@ when the remote is reachable and the histories permit synchronization.
 Ignored `.rusthead/` metadata stores update fingerprints, an update lock, and a
 separate `enrollment.json` containing completed enrollment records. It contains
 no copies of secret contents and is accessible only to the installation owner
-and group. Runtime change detection includes generated files, pinned image
-versions, environment values, overrides, and certificates; a config-only commit
+and group. `state.json` stores only ignored `local_inputs` and generated `outputs`,
+with paths relative to the site. Git-tracked inputs are not fingerprinted.
+Runtime changes are derived from outputs and local inputs other than
+`config.local.toml`; there is no separate stored runtime map.
+Runtime change detection includes generated files, pinned image
+versions, environment values, overrides, and public trust certificates; a config-only commit
 need not request a restart. No-op or ignored-only changes create no empty commits.
 
 `enrollment.json` is durable operational state: resetting `state.json` must not
@@ -56,7 +60,12 @@ are not persisted. The seed, credentials, and user configuration remain in
 `config.local.toml`.
 
 Enrollment saves each completed network independently. Receipt changes alone do
-not dirty update inputs; changes to actual keys or certificates still do. A missing
+not dirty update inputs. `pki/` and `traefik-tls/` are excluded from fingerprints.
+Custom TLS certificate/key paths are not added to the fingerprint inputs; keep
+those files outside the repository or ignored by Git.
+Their contents need not be readable by the user running updates, and rotation
+does not block `update sync` or trigger a restart. Handle any required reload or
+restart separately. TLS paths in configuration remain tracked inputs. A missing
 site private key invalidates its enrollment records, retaining the existing
 reenrollment behavior.
 
@@ -71,8 +80,11 @@ A migrated installation without a fingerprint baseline establishes one on its
 first successful update and conservatively requests a restart. Untracked legacy
 `.env` edits cannot be identified before this baseline exists.
 
-Compose commands warn about pending inputs but remain usable, including diagnostics
-and shutdown with invalid source configuration. Generation, image pulling, and
+Compose commands warn about uncommitted Git changes, local input changes, or
+changed outputs, but do not detect committed configuration changes awaiting
+generation. They remain usable, including diagnostics and shutdown with invalid
+source configuration. Updates do not check for edits made while they run; the
+update lock still prevents simultaneous rusthead updates. Generation, image pulling, and
 Compose commands all use `docker compose`; pulling and launching include the
 image lockfile after the override file.
 
