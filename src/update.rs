@@ -3,7 +3,7 @@ use crate::{
     git::Repository,
     modules,
     services::ServiceMap,
-    update_state::{self as state, Fingerprints, OUTPUTS, State, UpdateLock},
+    update_state::{self as state, OUTPUTS, State, UpdateLock},
 };
 use anyhow::{Context, ensure};
 use std::{
@@ -19,44 +19,29 @@ pub enum Mode {
     Commit,
 }
 
-fn inputs(repo: &Repository, conf: &Config, config: &Path) -> anyhow::Result<Fingerprints> {
-    let mut paths = repo.input_paths()?;
-    if let Some(volume) = state::volume_path(conf)? {
-        paths.retain(|path| !repo.root.join(path).starts_with(&volume));
-        if let Ok(relative) = volume.strip_prefix(&repo.root) {
-            ensure!(
-                repo.run(&[
-                    "ls-files",
-                    "--",
-                    relative
-                        .to_str()
-                        .context("Volume directory must be UTF-8")?
-                ])?
-                .is_empty(),
-                "Runtime data is tracked in Git; untrack the volume directory before updating"
-            );
-        }
+fn ensure_volume_untracked(repo: &Repository, conf: &Config) -> anyhow::Result<()> {
+    if let Some(volume) = state::volume_path(conf)?
+        && let Ok(relative) = volume.strip_prefix(&repo.root)
+    {
+        ensure!(
+            repo.run(&[
+                "ls-files",
+                "--",
+                relative
+                    .to_str()
+                    .context("Volume directory must be UTF-8")?
+            ])?
+            .is_empty(),
+            "Runtime data is tracked in Git; untrack the volume directory before updating"
+        );
     }
-    paths.push(config.to_owned());
-    paths.extend(state::local_paths(conf));
-    state::fingerprint(&repo.root, paths)
+    Ok(())
 }
-fn snapshot(repo: &Repository, conf: &Config, config: &Path) -> anyhow::Result<State> {
-    let local_inputs = state::fingerprint(&repo.root, state::local_paths(conf))?;
-    let outputs = state::fingerprint(&repo.root, OUTPUTS.iter().map(PathBuf::from))?;
-    let mut runtime = outputs.clone();
-    // config.local is a generation input. Its derived .env is the runtime artifact.
-    runtime.extend(
-        local_inputs
-            .iter()
-            .filter(|(key, _)| key.as_str() != "config.local.toml")
-            .map(|(k, v)| (k.clone(), v.clone())),
-    );
+
+fn snapshot(root: &Path) -> anyhow::Result<State> {
     Ok(State {
-        inputs: inputs(repo, conf, config)?,
-        local_inputs,
-        outputs,
-        runtime,
+        local_inputs: state::fingerprint(root, state::local_paths())?,
+        outputs: state::fingerprint(root, OUTPUTS.iter().map(PathBuf::from))?,
     })
 }
 
@@ -84,7 +69,8 @@ pub fn run(config: &PathBuf, mode: Mode, no_self_update: bool) -> anyhow::Result
     } else {
         None
     };
-    let before = snapshot(&repo, &conf, &config)?;
+    ensure_volume_untracked(&repo, &conf)?;
+    let before = snapshot(root)?;
     if !initial {
         match mode {
             Mode::Sync => {
@@ -128,42 +114,18 @@ pub fn run(config: &PathBuf, mode: Mode, no_self_update: bool) -> anyhow::Result
         drop(_lock);
         return replacement.resume(&config, mode);
     }
+    ensure_volume_untracked(&repo, conf)?;
     state::ensure_ignore(conf)?;
-    let start_inputs = inputs(&repo, conf, &config)?;
-    let head = repo.head()?;
-    let index = repo.run(&["ls-files", "--stage", "-z"])?;
     let mut services = ServiceMap::new(conf);
     for module in modules::MODULES {
         services.install_module(*module);
     }
-    services.write_all_checked(|| {
-        let mut now = inputs(&repo, conf, &config)?;
-        // Constructors may create missing certificates. Existing inputs must remain unchanged.
-        now.retain(|key, _| start_inputs.contains_key(key) || !["pki/", "trusted-ca-certs/", "traefik-tls/"].iter().any(|prefix| key.starts_with(prefix)));
-        ensure!(now == start_inputs, "Inputs changed during generation; retry after finishing your edits");
-        Ok(())
-    }).context("Generation failed; no update commit was created. Inspect any partial generated files before retrying")?;
-    let expected = inputs(&repo, conf, &config)?;
-    let mut expected_outputs = state::record_pending(root)?;
-    services.generate_lockfile_and_pull(|| {
-        let now = state::fingerprint(root, OUTPUTS.iter().map(PathBuf::from))?;
-        let without_lock = |fp: &Fingerprints| fp.iter().filter(|(k, _)| k.as_str() != "docker-image.lock.yml").map(|(k,v)| (k.clone(),v.clone())).collect::<Fingerprints>();
-        ensure!(without_lock(&now) == without_lock(&expected_outputs), "Generated files changed while resolving images; no commit was created");
-        expected_outputs = state::record_pending(root)?;
-        Ok(())
-    }).context("Image update failed; no update commit was created. Run update commit to retry; generated files must remain unedited")?;
-    ensure!(
-        expected == inputs(&repo, conf, &config)?
-            && head == repo.head()?
-            && index == repo.run(&["ls-files", "--stage", "-z"])?,
-        "Inputs or Git state changed during update; no commit was created. Inspect generated files before retrying"
-    );
-    let after = snapshot(&repo, conf, &config)?;
-    ensure!(
-        after.outputs == expected_outputs,
-        "Generated files changed during image validation or pull; no commit was created"
-    );
-    let changed = baseline.as_ref().is_none_or(|s| s.runtime != after.runtime);
+    services.write_all().context("Generation failed; no update commit was created. Inspect any partial generated files before retrying")?;
+    state::record_pending(root)?;
+    services.generate_lockfile_and_pull(|| state::record_pending(root).map(|_| ()))
+        .context("Image update failed; no update commit was created. Run update commit to retry; generated files must remain unedited")?;
+    let after = snapshot(root)?;
+    let changed = baseline.as_ref().is_none_or(|s| s.runtime_changed(&after));
     repo.commit()?;
     after.save(root)?;
     std::fs::remove_file(root.join(".rusthead/pending.json"))?;
@@ -189,7 +151,7 @@ pub fn run(config: &PathBuf, mode: Mode, no_self_update: bool) -> anyhow::Result
     }))
 }
 
-pub fn warn_pending(root: &Path, config: &Path) {
+pub fn warn_pending(root: &Path) {
     let check = || -> anyhow::Result<bool> {
         let Some(repo) = Repository::open(root)? else {
             return Ok(true);
@@ -200,14 +162,8 @@ pub fn warn_pending(root: &Path, config: &Path) {
         let Some(baseline) = State::load(root)? else {
             return Ok(true);
         };
-        let config = if config.is_dir() {
-            config.join("config.toml")
-        } else {
-            config.to_owned()
-        };
-        let conf = Config::load(&config)?;
-        let now = snapshot(&repo, &conf, &config)?;
-        Ok(now.inputs != baseline.inputs || now.outputs != baseline.outputs)
+        let now = snapshot(root)?;
+        Ok(now != baseline)
     };
     match check() {
         Ok(false) => {}

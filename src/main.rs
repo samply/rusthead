@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<ExitCode> {
     let cwd = std::env::current_dir()?;
     match &args.command {
         Subcommand::Compose { compose_args } => {
-            update::warn_pending(&cwd, &config);
+            update::warn_pending(&cwd);
             compose_command(&cwd, compose_args)?
                 .unchecked()
                 .run()
