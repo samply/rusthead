@@ -1,5 +1,29 @@
 # Native installation updates
 
+For a new x86_64 Linux installation with Docker available, run:
+
+```sh
+bash <(docker run --rm samply/rusthead bootstrap)
+```
+
+The script prompts for a site directory, site ID, hostname, optional HTTPS proxy,
+and binary directory (default `/usr/local/bin`). It extracts the executable from
+the scratch image and creates `config.toml`, then prints the sudo install command
+to run after enabling the desired modules. Existing configuration files are never
+overwritten; bootstrap can install the binary and link for an existing config too.
+Bootstrap stores the binary in `.rusthead/bin/rusthead` and creates a symlink
+in the selected binary directory.
+
+To select the binary image and the image tracked by future self-updates, set
+`IMAGE` for the host Bash process:
+
+```sh
+IMAGE=samply/rusthead:my-tag bash <(docker run --rm samply/rusthead bootstrap)
+```
+
+This value is written to `config.toml`; it does not need to be passed into the
+container that prints the script.
+
 Run commands against the installation directory or its selected configuration file:
 
 ```sh
@@ -123,18 +147,17 @@ its exit status. An internal handoff prevents a second binary-update check durin
 that continuation. A binary replacement alone does not restart services: generated
 runtime changes still determine the restart status.
 
-`install` copies the executable to `.rusthead/bin/rusthead`, owned by the
-`bridgehead` service account, and points systemd at that managed copy. After
-successful installation it creates `/usr/local/bin/rusthead` as an absolute
-symlink to the same executable, replacing an existing launcher atomically. Manual
-`rusthead` commands and systemd therefore use the same binary; self-updates replace
-the managed target and preserve the symlink.
+Bootstrap creates the executable at `.rusthead/bin/rusthead` and a symlink in the
+selected binary directory (default `/usr/local/bin`). `install` assigns ownership
+to the `bridgehead` service account and points systemd at the managed binary. When
+invoked from another executable, such as a development build, it copies that
+executable into the managed location. It does not create or change PATH symlinks.
+Manual commands through the symlink and systemd use the same binary; self-updates
+replace the managed target and preserve the symlink.
 
-Set `BRIDGEHEAD_BIN_DIR` when installing to choose a different launcher directory
-(e.g. `sudo env BRIDGEHEAD_BIN_DIR=/opt/bin rusthead --config /srv/site install`).
-Ensure that directory precedes other rusthead installations on `PATH`. Installing
-another site into the same launcher directory points the command at that site's
-managed binary. The launcher directory stays protected; only the managed binary's
+Ensure the selected directory precedes other rusthead installations on `PATH`.
+Bootstrapping another site into the same launcher directory points the command at
+that site's managed binary. The launcher directory stays protected; only the managed
 directory needs to be writable by `bridgehead`. Explicitly invoking some other
 binary by its path still updates that copy instead. Pull, extraction, and
 executable validation failures abort generation and leave the existing executable
@@ -173,8 +196,10 @@ release artifact.
 
 ## Local development with just
 
-`just bootstrap` creates `bridgehead/config.toml` with a local site ID and hostname.
-Edit it to enable the modules you want; subsequent commands preserve the file.
+`just bootstrap` builds the local image and runs the interactive bootstrap script
+if `bridgehead/config.toml` is missing. It prompts for site settings and a binary
+directory, extracting from the local image without pulling from a registry.
+Edit the config to enable the modules you want; subsequent commands preserve it.
 Set `BRIDGEHEAD_CONFIG_PATH` to use another directory or a `.toml` file.
 
 - `just build` builds the debug musl executable and the local scratch image
@@ -190,4 +215,5 @@ Development recipes use `--no-self-update` so locally built binaries are not
 replaced by a registry image. The installer forwards this option to its update
 processes and generated systemd commands. Service image pulls and Git behavior
 are unchanged. Install again without this option to enable scheduled binary
-updates. The native `bootstrap` subcommand is not used by these recipes.
+updates. The recipes run `static/bootstrap.sh`, the same script emitted by the
+native `bootstrap` subcommand.

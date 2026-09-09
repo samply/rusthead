@@ -63,9 +63,12 @@ if [ ! -f "$key" ]; then printf 'private key\n' > "$key"; fi
     }
 
     fn run_command(&self, command: &str, update_status: u8) -> Output {
-        let launcher = self.temp.path().join("bin/rusthead");
-        let executable = if launcher.exists() {
-            launcher
+        let managed = self
+            .temp
+            .path()
+            .join("site with spaces/.rusthead/bin/rusthead");
+        let executable = if managed.exists() {
+            managed
         } else {
             env!("CARGO_BIN_EXE_rusthead").into()
         };
@@ -80,7 +83,6 @@ if [ ! -f "$key" ]; then printf 'private key\n' > "$key"; fi
                     std::env::var("PATH").unwrap()
                 ),
             )
-            .env("BRIDGEHEAD_BIN_DIR", self.temp.path().join("bin"))
             .env("INSTALL_TEST_ROOT", self.temp.path())
             .env("INSTALL_TEST_UPDATE_STATUS", update_status.to_string())
             .env(
@@ -134,7 +136,6 @@ fn repeated_install_preserves_repository_and_private_key() {
     assert!(log.contains(root.join("site with spaces/custom.toml").to_str().unwrap()));
     let managed = root.join("site with spaces/.rusthead/bin/rusthead");
     assert!(managed.is_file());
-    assert_eq!(fs::read_link(root.join("bin/rusthead")).unwrap(), managed);
     assert!(log.contains(managed.to_str().unwrap()));
     assert_ne!(
         fs::metadata(managed).unwrap().permissions().mode() & 0o111,
@@ -167,7 +168,6 @@ fn failed_update_stops_installation_before_enrollment() {
     assert_eq!(unsafe { libc::geteuid() }, 0);
     let installation = Installation::new();
     let result = installation.run(7);
-    assert!(!installation.temp.path().join("bin/rusthead").exists());
     assert_eq!(
         result.status.code(),
         Some(7),

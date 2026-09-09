@@ -30,6 +30,7 @@ enum Subcommand {
         #[clap(subcommand)]
         mode: update::Mode,
     },
+    /// Print a Bash script that installs the native binary and creates a configuration.
     Bootstrap,
     Enroll,
     Install,
@@ -57,6 +58,10 @@ struct Args {
 
 fn main() -> anyhow::Result<ExitCode> {
     let args = Args::parse();
+    if let Subcommand::Bootstrap = args.command {
+        println!("{}", include_str!("../static/bootstrap.sh"));
+        return Ok(ExitCode::SUCCESS);
+    }
     let config = args
         .config
         .canonicalize()
@@ -81,7 +86,7 @@ fn main() -> anyhow::Result<ExitCode> {
                 .ok_or(anyhow::anyhow!("Killed by signal"))
         }
         Subcommand::Update { mode } => update::run(&config, *mode, args.no_self_update),
-        Subcommand::Bootstrap => todo!("Not implemented"),
+        Subcommand::Bootstrap => unreachable!("bootstrap is handled before loading configuration"),
         Subcommand::Enroll => install::enroll(&config),
         Subcommand::Install => install::install(&config, args.no_self_update),
     }
