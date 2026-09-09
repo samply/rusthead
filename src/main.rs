@@ -47,6 +47,10 @@ struct Args {
     /// Path to the bridgehead configuration file
     config: PathBuf,
 
+    /// Keep the current executable when developing with a local build.
+    #[clap(long, global = true)]
+    no_self_update: bool,
+
     #[clap(subcommand)]
     command: Subcommand,
 }
@@ -76,10 +80,10 @@ fn main() -> anyhow::Result<ExitCode> {
                 .and_then(|c| Some(ExitCode::from(u8::try_from(c).ok()?)))
                 .ok_or(anyhow::anyhow!("Killed by signal"))
         }
-        Subcommand::Update { mode } => update::run(&config, *mode),
+        Subcommand::Update { mode } => update::run(&config, *mode, args.no_self_update),
         Subcommand::Bootstrap => todo!("Not implemented"),
         Subcommand::Enroll => install::enroll(&config),
-        Subcommand::Install => install::install(&config),
+        Subcommand::Install => install::install(&config, args.no_self_update),
     }
 }
 
@@ -113,6 +117,11 @@ fn compose_command_with_lock(
         "--project-directory".into(),
         config_dir.as_os_str().to_owned(),
     ];
+    if services.is_empty() {
+        anyhow::bail!(
+            "There are currently no services defined by your configuration.\nPlease enable a service in your config.toml and run `rusthead update commit`"
+        );
+    }
     for service in services {
         args.push(std::ffi::OsString::from("-f"));
         args.push(service.into_os_string());

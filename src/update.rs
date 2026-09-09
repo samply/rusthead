@@ -60,7 +60,7 @@ fn snapshot(repo: &Repository, conf: &Config, config: &Path) -> anyhow::Result<S
     })
 }
 
-pub fn run(config: &PathBuf, mode: Mode) -> anyhow::Result<ExitCode> {
+pub fn run(config: &PathBuf, mode: Mode, no_self_update: bool) -> anyhow::Result<ExitCode> {
     let config = if config.is_dir() {
         config.join("config.toml")
     } else {
@@ -124,7 +124,7 @@ pub fn run(config: &PathBuf, mode: Mode) -> anyhow::Result<ExitCode> {
     }
     // Pulling may have changed both the configuration and its local path settings.
     let conf = Box::leak(Box::new(Config::load(&config)?));
-    if let Some(replacement) = crate::self_update::check(conf)? {
+    if !no_self_update && let Some(replacement) = crate::self_update::check(conf)? {
         drop(_lock);
         return replacement.resume(&config, mode);
     }

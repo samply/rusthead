@@ -28,7 +28,7 @@ fn load_materialized(config: &PathBuf) -> anyhow::Result<&'static Config> {
     Ok(conf)
 }
 
-pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
+pub fn install(config: &PathBuf, no_self_update: bool) -> anyhow::Result<ExitCode> {
     require_root()?;
     let conf = load_materialized(config)?;
     // Persist the seed and pending networks before update runs in another process.
@@ -83,7 +83,12 @@ pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
         Err(error) => return Err(error).context("Failed to check Docker systemd service"),
     };
     if systemd {
-        install_systemd(Path::new("/etc/systemd/system"), &executable, config)?;
+        install_systemd(
+            Path::new("/etc/systemd/system"),
+            &executable,
+            config,
+            no_self_update,
+        )?;
         cmd!("systemctl", "daemon-reload").run()?;
         cmd!("systemctl", "enable", "bridgehead.service").run()?;
     } else {
@@ -91,7 +96,7 @@ pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
             "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
         );
     }
-    let status = run_update(&executable, config, &conf.path)?;
+    let status = run_update(&executable, config, &conf.path, no_self_update)?;
     if !matches!(status, 0 | 3) {
         return Ok(ExitCode::from(status));
     }
@@ -105,11 +110,15 @@ pub fn install(config: &PathBuf) -> anyhow::Result<ExitCode> {
     };
     if needs_enrollment {
         // Accept enrollment's local inputs before the clean-only timer starts.
-        let status = run_update(&executable, config, &conf.path)?;
+        let status = run_update(&executable, config, &conf.path, no_self_update)?;
         if !matches!(status, 0 | 3) {
             return Ok(ExitCode::from(status));
         }
     }
+    let bin_dir = std::env::var_os("BRIDGEHEAD_BIN_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/usr/local/bin"));
+    install_launcher(&executable, &bin_dir)?;
     if systemd {
         cmd!("systemctl", "enable", "--now", "bridgehead-update.timer").run()?;
     }
@@ -135,22 +144,54 @@ fn install_binary(conf: &Config, source: &Path) -> anyhow::Result<PathBuf> {
     Ok(destination)
 }
 
-fn run_update(executable: &Path, config: &Path, directory: &Path) -> anyhow::Result<u8> {
-    let status = cmd!(
-        "sudo",
-        "-u",
-        "bridgehead",
-        executable,
-        "--config",
-        config,
-        "update",
-        "commit"
-    )
-    .dir(directory)
-    .unchecked()
-    .run()
-    .context("Failed to run bridgehead update")?
-    .status;
+/// Publish a PATH entry without making its directory writable by the service user.
+fn install_launcher(executable: &Path, bin_dir: &Path) -> anyhow::Result<()> {
+    let executable = executable
+        .canonicalize()
+        .context("Cannot resolve managed executable")?;
+    fs::create_dir_all(bin_dir).with_context(|| format!("Cannot create {}", bin_dir.display()))?;
+    let launcher = bin_dir.canonicalize()?.join("rusthead");
+    ensure!(
+        launcher != executable,
+        "The launcher directory must differ from the managed binary directory"
+    );
+    if fs::read_link(&launcher).ok().as_ref() == Some(&executable) {
+        return Ok(());
+    }
+    // Rename replaces an old binary or symlink, without following an old link's target.
+    let temp = tempfile::Builder::new()
+        .prefix(".rusthead-link-")
+        .tempdir_in(bin_dir)?;
+    let link = temp.path().join("rusthead");
+    std::os::unix::fs::symlink(&executable, &link)?;
+    fs::rename(link, &launcher)
+        .with_context(|| format!("Cannot install launcher {}", launcher.display()))?;
+    Ok(())
+}
+
+fn run_update(
+    executable: &Path,
+    config: &Path,
+    directory: &Path,
+    no_self_update: bool,
+) -> anyhow::Result<u8> {
+    let mut args = vec![
+        std::ffi::OsString::from("-u"),
+        "bridgehead".into(),
+        executable.into(),
+        "--config".into(),
+        config.into(),
+    ];
+    if no_self_update {
+        args.push("--no-self-update".into());
+    }
+    args.extend(["update".into(), "commit".into()]);
+    let status = duct::cmd("sudo", args)
+        .dir(directory)
+        .unchecked()
+        .run()
+        .context("Failed to run bridgehead update")?
+        .status;
     match status.code() {
         Some(code) => {
             if !matches!(code, 0 | 3) {
@@ -272,8 +313,16 @@ fn unit_arg(path: &Path) -> anyhow::Result<String> {
     ))
 }
 
-fn install_systemd(directory: &Path, executable: &Path, config: &Path) -> anyhow::Result<()> {
-    let command = format!("{} --config {}", unit_arg(executable)?, unit_arg(config)?);
+fn install_systemd(
+    directory: &Path,
+    executable: &Path,
+    config: &Path,
+    no_self_update: bool,
+) -> anyhow::Result<()> {
+    let mut command = format!("{} --config {}", unit_arg(executable)?, unit_arg(config)?);
+    if no_self_update {
+        command.push_str(" --no-self-update");
+    }
     let units = [
         ("bridgehead.service", format!("[Unit]\nDescription=Bridgehead Service\nRequires=docker.service\n\n[Service]\nExecStart={command} compose up --abort-on-container-exit\nRestart=always\nUser=bridgehead\nGroup=docker\n\n[Install]\nWantedBy=multi-user.target\n")),
         ("bridgehead-update.service", format!("[Unit]\nDescription=Bridgehead Update Service\nRequires=docker.service\n\n[Service]\nExecStart={command} update sync\nSuccessExitStatus=3\nUser=bridgehead\nGroup=docker\nExecStopPost=+/bin/bash -c 'if [ \"$$EXIT_STATUS\" = \"3\" ] || [ \"$$EXIT_STATUS\" = \"4\" ]; then systemctl restart bridgehead.service; fi'\n")),
@@ -413,10 +462,10 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let executable = Path::new("/opt/bridge head/rusthead");
         let config = Path::new("/srv/bridge head/custom.toml");
-        install_systemd(temp.path(), executable, config).unwrap();
+        install_systemd(temp.path(), executable, config, false).unwrap();
         let service = temp.path().join("bridgehead.service");
         let modified = fs::metadata(&service).unwrap().modified().unwrap();
-        install_systemd(temp.path(), executable, config).unwrap();
+        install_systemd(temp.path(), executable, config, false).unwrap();
         assert_eq!(
             fs::metadata(&service).unwrap().modified().unwrap(),
             modified
@@ -441,6 +490,48 @@ mod tests {
             "\"/srv/50%%/$$site\""
         );
         assert!(unit_arg(Path::new("/srv/line\nbreak")).is_err());
+    }
+
+    #[test]
+    fn launcher_replaces_old_binary_and_links_without_touching_their_targets() {
+        use std::os::unix::fs::{MetadataExt, symlink};
+        let temp = tempfile::tempdir().unwrap();
+        let bin = temp.path().join("bin");
+        fs::create_dir(&bin).unwrap();
+        let managed = temp.path().join("managed");
+        fs::write(&managed, "new binary").unwrap();
+        let launcher = bin.join("rusthead");
+        fs::write(&launcher, "old binary").unwrap();
+        install_launcher(&managed, &bin).unwrap();
+        assert_eq!(fs::read_link(&launcher).unwrap(), managed);
+        let inode = fs::symlink_metadata(&launcher).unwrap().ino();
+        install_launcher(&managed, &bin).unwrap();
+        assert_eq!(inode, fs::symlink_metadata(&launcher).unwrap().ino());
+        fs::remove_file(&launcher).unwrap();
+        let other = temp.path().join("other");
+        fs::write(&other, "keep this binary").unwrap();
+        symlink(&other, &launcher).unwrap();
+        install_launcher(&managed, &bin).unwrap();
+        assert_eq!(fs::read_link(&launcher).unwrap(), managed);
+        assert_eq!(fs::read_to_string(other).unwrap(), "keep this binary");
+        fs::remove_file(&launcher).unwrap();
+        symlink(temp.path().join("missing"), &launcher).unwrap();
+        install_launcher(&managed, &bin).unwrap();
+        assert_eq!(fs::read_link(&launcher).unwrap(), managed);
+    }
+
+    #[test]
+    fn development_install_keeps_binary_updates_disabled_in_systemd() {
+        let temp = tempfile::tempdir().unwrap();
+        install_systemd(
+            temp.path(),
+            Path::new("/srv/site/.rusthead/bin/rusthead"),
+            Path::new("/srv/site/config.toml"),
+            true,
+        )
+        .unwrap();
+        let unit = fs::read_to_string(temp.path().join("bridgehead-update.service")).unwrap();
+        assert!(unit.contains("--no-self-update update sync"));
     }
 
     #[test]

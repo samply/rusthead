@@ -112,11 +112,21 @@ that continuation. A binary replacement alone does not restart services: generat
 runtime changes still determine the restart status.
 
 `install` copies the executable to `.rusthead/bin/rusthead`, owned by the
-`bridgehead` service account, and points systemd at that managed copy. Use this
-copy for later manual commands too. Running `update` from another copy checks and
-updates that executable instead; its containing directory must be writable by the
-caller. Pull, extraction, and executable validation failures abort generation and
-leave the existing executable in place.
+`bridgehead` service account, and points systemd at that managed copy. After
+successful installation it creates `/usr/local/bin/rusthead` as an absolute
+symlink to the same executable, replacing an existing launcher atomically. Manual
+`rusthead` commands and systemd therefore use the same binary; self-updates replace
+the managed target and preserve the symlink.
+
+Set `BRIDGEHEAD_BIN_DIR` when installing to choose a different launcher directory
+(e.g. `sudo env BRIDGEHEAD_BIN_DIR=/opt/bin rusthead --config /srv/site install`).
+Ensure that directory precedes other rusthead installations on `PATH`. Installing
+another site into the same launcher directory points the command at that site's
+managed binary. The launcher directory stays protected; only the managed binary's
+directory needs to be writable by `bridgehead`. Explicitly invoking some other
+binary by its path still updates that copy instead. Pull, extraction, and
+executable validation failures abort generation and leave the existing executable
+in place.
 
 The distribution image is `FROM scratch` and contains only the static executable.
 The host needs Git and Docker with Compose. Secret synchronization runs
@@ -147,3 +157,25 @@ isolated user namespace. Self-update tests replace private executable copies and
 Docker transport; they never replace the developer's compiled binary. CI also
 smoke-tests the real scratch image and compares its extracted binary with the
 release artifact.
+
+
+## Local development with just
+
+`just bootstrap` creates `bridgehead/config.toml` with a local site ID and hostname.
+Edit it to enable the modules you want; subsequent commands preserve the file.
+Set `BRIDGEHEAD_CONFIG_PATH` to use another directory or a `.toml` file.
+
+- `just build` builds the debug musl executable and the local scratch image
+  (`IMAGE`, default `samply/rusthead:localbuild`).
+- `just run` builds and installs the local executable with sudo, including
+  enrollment and systemd setup.
+- `just up` runs installation, then stops and starts Compose sequentially.
+- `just down` stops Compose without rebuilding.
+- `just bridgehead update commit` generates and accepts local configuration edits.
+  Other CLI arguments can be passed through `just bridgehead` too.
+
+Development recipes use `--no-self-update` so locally built binaries are not
+replaced by a registry image. The installer forwards this option to its update
+processes and generated systemd commands. Service image pulls and Git behavior
+are unchanged. Install again without this option to enable scheduled binary
+updates. The native `bootstrap` subcommand is not used by these recipes.
