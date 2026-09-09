@@ -3,7 +3,7 @@ use anyhow::{Context, ensure};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fs::{self, File, OpenOptions},
     os::{
         fd::AsRawFd,
@@ -16,18 +16,14 @@ pub type Fingerprints = BTreeMap<String, String>;
 pub const LOCAL_INPUTS: &[&str] = &[
     "config.local.toml",
     "docker-compose.override.yml",
-    "pki",
     "trusted-ca-certs",
-    "traefik-tls",
 ];
 pub const OUTPUTS: &[&str] = &["services", "docker-image.lock.yml", ".env"];
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct State {
-    pub inputs: Fingerprints,
     pub local_inputs: Fingerprints,
     pub outputs: Fingerprints,
-    pub runtime: Fingerprints,
 }
 
 pub struct UpdateLock {
@@ -79,6 +75,19 @@ pub(crate) fn prepare_directory(root: &Path) -> anyhow::Result<PathBuf> {
 }
 
 impl State {
+    pub fn runtime_changed(&self, other: &Self) -> bool {
+        // config.local affects runtime through the generated .env and service files.
+        self.outputs != other.outputs
+            || self
+                .local_inputs
+                .iter()
+                .filter(|(key, _)| key.as_str() != "config.local.toml")
+                .ne(other
+                    .local_inputs
+                    .iter()
+                    .filter(|(key, _)| key.as_str() != "config.local.toml"))
+    }
+
     pub fn load(root: &Path) -> anyhow::Result<Option<Self>> {
         match fs::read(root.join(".rusthead/state.json")) {
             Ok(bytes) => Ok(Some(
@@ -111,62 +120,49 @@ pub fn fingerprint(
 ) -> anyhow::Result<Fingerprints> {
     let mut result = Fingerprints::new();
     for path in paths {
-        visit(root, &path, &mut result, &mut BTreeSet::new())?;
+        let full = root.join(&path);
+        let metadata = match fs::metadata(&full) {
+            Ok(metadata) => metadata,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e).with_context(|| format!("Cannot inspect {}", full.display())),
+        };
+        if metadata.is_dir() {
+            // Generated services and trust certificates are flat directories.
+            for entry in fs::read_dir(&full)? {
+                fingerprint_file(root, &path.join(entry?.file_name()), &mut result)?;
+            }
+        } else {
+            fingerprint_file(root, &path, &mut result)?;
+        }
     }
     Ok(result)
 }
-fn visit(
-    root: &Path,
-    path: &Path,
-    result: &mut Fingerprints,
-    ancestors: &mut BTreeSet<PathBuf>,
-) -> anyhow::Result<()> {
+
+fn fingerprint_file(root: &Path, path: &Path, result: &mut Fingerprints) -> anyhow::Result<()> {
     let full = root.join(path);
-    let meta = match fs::symlink_metadata(&full) {
-        Ok(meta) => meta,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(e) => return Err(e).with_context(|| format!("Cannot inspect {}", full.display())),
-    };
+    ensure!(
+        fs::metadata(&full)?.is_file(),
+        "Expected a file while fingerprinting {}",
+        full.display()
+    );
     let key = path
         .to_str()
         .context("Update fingerprint paths must be UTF-8")?
         .to_owned();
-    if meta.file_type().is_symlink() {
-        let target = fs::read_link(&full)?;
+    if fs::symlink_metadata(&full)?.file_type().is_symlink() {
         result.insert(
             format!("{key}/@symlink"),
-            target.to_string_lossy().into_owned(),
+            fs::read_link(&full)?.to_string_lossy().into_owned(),
         );
     }
-    let meta = fs::metadata(&full).with_context(|| format!("Cannot follow {}", full.display()))?;
-    if meta.is_dir() {
-        let canonical = full.canonicalize()?;
-        ensure!(
-            ancestors.insert(canonical.clone()),
-            "Symlink cycle at {}",
-            full.display()
-        );
-        for entry in fs::read_dir(full)? {
-            visit(root, &path.join(entry?.file_name()), result, ancestors)?;
-        }
-        ancestors.remove(&canonical);
-    } else {
-        ensure!(
-            meta.is_file(),
-            "Cannot fingerprint special file {}",
-            full.display()
-        );
-        result.insert(key, format!("{:x}", Sha256::digest(fs::read(&full)?)));
-    }
+    let contents =
+        fs::read(&full).with_context(|| format!("Cannot fingerprint {}", full.display()))?;
+    result.insert(key, format!("{:x}", Sha256::digest(contents)));
     Ok(())
 }
 
-pub fn local_paths(conf: &crate::Config) -> Vec<PathBuf> {
-    let mut paths: Vec<_> = LOCAL_INPUTS.iter().map(PathBuf::from).collect();
-    if let Some(tls) = conf.traefik.as_ref().and_then(|t| t.tls.as_ref()) {
-        paths.extend([tls.cert_file.clone(), tls.key_file.clone()]);
-    }
-    paths
+pub fn local_paths() -> Vec<PathBuf> {
+    LOCAL_INPUTS.iter().map(PathBuf::from).collect()
 }
 
 pub fn ensure_ignore(conf: &crate::Config) -> anyhow::Result<()> {

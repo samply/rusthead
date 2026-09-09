@@ -251,15 +251,7 @@ impl ServiceMap {
         self.map.len()
     }
 
-    #[cfg(test)]
     pub fn write_all(&mut self) -> anyhow::Result<()> {
-        self.write_all_checked(|| Ok(()))
-    }
-
-    pub fn write_all_checked(
-        &mut self,
-        check_inputs: impl FnOnce() -> anyhow::Result<()>,
-    ) -> anyhow::Result<()> {
         self.materialize();
         // Render everything before replacing the previous service definitions.
         let rendered = self
@@ -267,7 +259,6 @@ impl ServiceMap {
             .values()
             .map(|service| Ok((service.service_name(), service.render(self.config)?)))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        check_inputs()?;
         let services_dir = self.config.path.join("services");
         fs::create_dir_all(&services_dir)?;
         let expected: std::collections::HashSet<_> = rendered
