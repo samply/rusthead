@@ -8,7 +8,7 @@ use std::{
 use anyhow::Context;
 use askama::Template;
 
-use crate::{Config, bridgehead::Bridgehead, modules::Module};
+use crate::{Config, modules::Module};
 
 pub mod beam_connect;
 pub mod dnpm_node;
@@ -230,9 +230,11 @@ impl std::fmt::Debug for ServiceMap {
 }
 
 impl ServiceMap {
-    const ROOT_NODE: TypeId = TypeId::of::<Bridgehead>();
+    const ROOT_NODE: TypeId = TypeId::of::<()>();
 
     pub fn new(config: &'static Config) -> Self {
+        // Rebuild configured networks while retaining enrollment history.
+        config.beam_networks.borrow_mut().clear();
         let mut deps = solvent::DepGraph::new();
         deps.register_node(Self::ROOT_NODE);
         Self {
@@ -251,63 +253,70 @@ impl ServiceMap {
 
     pub fn write_all(&mut self) -> anyhow::Result<()> {
         self.materialize();
-        self.write_composables()
-            .context("Failed to write services")?;
-        Bridgehead::new(self.config).write()?;
+        // Render everything before replacing the previous service definitions.
+        let rendered = self
+            .map
+            .values()
+            .map(|service| Ok((service.service_name(), service.render(self.config)?)))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let services_dir = self.config.path.join("services");
+        fs::create_dir_all(&services_dir)?;
+        let expected: std::collections::HashSet<_> = rendered
+            .iter()
+            .map(|(name, _)| format!("{name}.yml"))
+            .collect();
+        for (name, contents) in rendered {
+            fs::write(services_dir.join(format!("{name}.yml")), contents)?;
+        }
+        for entry in fs::read_dir(&services_dir)? {
+            let entry = entry?;
+            if !expected.contains(&entry.file_name().to_string_lossy().into_owned()) {
+                anyhow::ensure!(
+                    !entry.file_type()?.is_dir(),
+                    "Unexpected directory in generated services: {}",
+                    entry.path().display()
+                );
+                fs::remove_file(entry.path())?;
+            }
+        }
         self.config.write_local_conf()?;
-        fs::write(
-            self.config.path.join(".gitignore"),
-            include_str!("../../static/.gitignore"),
-        )?;
-        #[cfg(not(test))]
-        self.generate_lockfile_and_pull()
-            .context("Failed to generate lockfile and pull images")?;
+        crate::update_state::ensure_ignore(self.config)?;
         Ok(())
     }
 
-    #[cfg(not(test))]
-    fn generate_lockfile_and_pull(&self) -> anyhow::Result<()> {
+    pub(crate) fn generate_lockfile_and_pull(
+        &self,
+        checkpoint: impl FnOnce() -> anyhow::Result<()>,
+    ) -> anyhow::Result<()> {
         if self.map.is_empty() {
+            match fs::remove_file(self.config.path.join("docker-image.lock.yml")) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.into()),
+            }
+            checkpoint()?;
             return Ok(());
         }
-        use std::process::Command;
-        let mut cmd = Command::new("docker-compose");
-        let mut pull_cmd = Command::new("docker-compose");
-        for service in self.map.values() {
-            let path = self
-                .config
-                .path
-                .join("services")
-                .join(format!("{}.yml", service.service_name()));
-            cmd.arg("-f").arg(&path);
-            pull_cmd.arg("-f").arg(&path);
-        }
-        if fs::exists(self.config.path.join("docker-compose.override.yml"))? {
-            cmd.arg("-f").arg("docker-compose.override.yml");
-            pull_cmd.arg("-f").arg("docker-compose.override.yml");
-        }
-        cmd.args(["--env-file", ".env", "config", "--lock-image-digests"])
-            .current_dir(&self.config.path);
-        pull_cmd
-            .args(["--env-file", ".env", "pull", "--quiet"])
-            .current_dir(&self.config.path);
-        let output = cmd.output()?;
-        if !output.status.success() {
-            anyhow::bail!(
-                "Failed to generate lockfile: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
+        let output = crate::compose_command_with_lock(
+            &self.config.path,
+            &["config".into(), "--lock-image-digests".into()],
+            false,
+        )?
+        .stdout_capture()
+        .stderr_capture()
+        .run()
+        .context("Failed to resolve image digests")?;
         fs::write(
             self.config.path.join("docker-image.lock.yml"),
             output.stdout,
         )?;
-        if !pull_cmd.status()?.success() {
-            anyhow::bail!(
-                "Failed to pull images: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
+        checkpoint()?;
+        crate::compose_command(&self.config.path, &["config".into(), "--quiet".into()])?
+            .run()
+            .context("Failed to validate pinned Compose configuration")?;
+        crate::compose_command(&self.config.path, &["pull".into(), "--quiet".into()])?
+            .run()
+            .context("Failed to pull pinned images")?;
         Ok(())
     }
 
@@ -348,22 +357,7 @@ impl ServiceMap {
         m.install(self, &self.config);
     }
 
-    fn write_composables(&self) -> anyhow::Result<()> {
-        let services_dir = self.config.path.join("services");
-        _ = fs::remove_dir_all(&services_dir);
-        fs::create_dir_all(&services_dir)?;
-        for service in self.map.values() {
-            let service_name = service.service_name();
-            eprintln!("Generating service {service_name}");
-            fs::write(
-                services_dir.join(format!("{}.yml", service.service_name())),
-                service.render(self.config)?,
-            )?;
-        }
-        Ok(())
-    }
-
-    fn materialize(&mut self) {
+    pub(crate) fn materialize(&mut self) {
         let deps = std::mem::take(&mut self.deps);
         for dep in deps.dependencies_of(&Self::ROOT_NODE).unwrap() {
             let dep = dep.expect("No cycle");

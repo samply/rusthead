@@ -11,3 +11,4 @@ config.local.toml
 /trusted-ca-certs
 /traefik-tls
 docker-compose.override.yml
+/.rusthead/
