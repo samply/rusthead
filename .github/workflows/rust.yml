@@ -1,15 +1,53 @@
-name: Rust
+name: Native Rust and Docker
 
 on:
   push:
   workflow_dispatch:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  rust:
-    # This workflow defines how a maven package is built, tested and published.
-    # Visit: https://github.com/samply/github-workflows/blob/develop/.github/workflows/docker-ci.yml, for more information
-    uses: samply/github-workflows/.github/workflows/rust.yml@main
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - name: Install musl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          docker compose version
+      - run: cargo fmt --all --check
+      - name: Test musl binaries
+        run: cargo nextest run --locked --target x86_64-unknown-linux-musl --no-fail-fast
+      - name: Test root-only installation flows
+        run: sudo env "PATH=$PATH" "CARGO_HOME=$HOME/.cargo" "RUSTUP_HOME=$HOME/.rustup" cargo nextest run --locked --target x86_64-unknown-linux-musl --no-fail-fast --test install --run-ignored only
+      - name: Build static release executable
+        run: |
+          cargo build --locked --release --target x86_64-unknown-linux-musl
+          file target/x86_64-unknown-linux-musl/release/rusthead
+          if readelf -l target/x86_64-unknown-linux-musl/release/rusthead | grep -q INTERP; then
+            echo 'Release executable must be statically linked'
+            exit 1
+          fi
+          mkdir -p artifacts
+          cp target/x86_64-unknown-linux-musl/release/rusthead artifacts/rusthead
+      - uses: actions/upload-artifact@v6
+        with:
+          name: rusthead-amd64-musl
+          path: artifacts/rusthead
+          if-no-files-found: error
+
+  docker:
+    needs: build-test
+    uses: samply/github-workflows/.github/workflows/docker-ci.yml@main
     permissions:
       contents: read
       packages: write
@@ -17,11 +55,10 @@ jobs:
       security-events: write
       statuses: read
     with:
-        image-prefix: "samply/"
-        components: '[ "rusthead" ]'
-        architectures: '[ "amd64" ]'
-        test-via-script: false
-        cargo-fmt-check: true
+      image-name: samply/rusthead
+      build-platforms: linux/amd64
+      artifact-name: rusthead-amd64-musl
+      push-to: ${{ github.event_name == 'pull_request' && 'none' || 'auto' }}
     secrets:
-        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

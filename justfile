@@ -1,35 +1,35 @@
 set shell := ["bash", "-cue"]
+set positional-arguments
 
-ARCH := `docker version --format '{{.Server.Arch}}'`
 CONFIG_PATH := env("BRIDGEHEAD_CONFIG_PATH", "./bridgehead")
+CONFIG_FILE := if CONFIG_PATH =~ '\.toml$' { CONFIG_PATH } else { CONFIG_PATH / "config.toml" }
+BINARY := "target/x86_64-unknown-linux-musl/debug/rusthead"
 export IMAGE := env("IMAGE", "samply/rusthead:localbuild")
 
-run: build ensure_bootstrap
-  sudo {{ CONFIG_PATH }}/bridgehead install
+# Build and install the local executable, including enrollment and systemd setup.
+run: build bootstrap
+  sudo {{ quote(BINARY) }} --config {{ quote(CONFIG_FILE) }} --no-self-update install
 
-up: down_bg run
-  {{ CONFIG_PATH }}/bridgehead compose up
-
-[private]
-down_bg:
-  {{ CONFIG_PATH }}/bridgehead compose down &
-
-[private]
-ensure_bootstrap:
-  if ! {{ path_exists(CONFIG_PATH / "bridgehead") }}; then IMAGE=$IMAGE just bootstrap; fi
+# Stop and start Compose sequentially using the native executable.
+up: run
+  {{ quote(BINARY) }} --config {{ quote(CONFIG_FILE) }} compose down
+  {{ quote(BINARY) }} --config {{ quote(CONFIG_FILE) }} compose up
 
 down:
-  {{ CONFIG_PATH }}/bridgehead compose down
+  {{ quote(BINARY) }} --config {{ quote(CONFIG_FILE) }} compose down
 
-bridgehead *args: build ensure_bootstrap
-  {{ CONFIG_PATH }}/bridgehead {{ args }}
+# Forward arguments literally; update's restart-needed status (3) is successful.
+bridgehead *args: build bootstrap
+  status=0; {{ quote(BINARY) }} --config {{ quote(CONFIG_FILE) }} --no-self-update "$@" || status=$?; if [ "$status" -eq 3 ] && [ "${1:-}" = update ]; then exit 0; fi; exit "$status"
 
+# The scratch distribution image requires a statically linked executable.
 build:
-  cargo build
-  mkdir -p artifacts/binaries-{{ ARCH }}/
-  cp target/debug/rusthead artifacts/binaries-{{ ARCH }}/rusthead
-  docker build -t $IMAGE .
+  cargo build --locked --target x86_64-unknown-linux-musl
+  mkdir -p artifacts
+  cp {{ quote(BINARY) }} artifacts/rusthead
+  docker build --platform linux/amd64 -t "$IMAGE" .
 
+# Run interactive bootstrap against the local image when configuration is missing.
 bootstrap: build
-  mkdir -p {{ CONFIG_PATH }}
-  cd {{ CONFIG_PATH }} && bash <(docker run --rm $IMAGE bootstrap)
+  if [ ! -e {{ quote(CONFIG_FILE) }} ]; then BRIDGEHEAD_CONFIG_PATH={{ quote(CONFIG_FILE) }} BOOTSTRAP_SKIP_PULL=1 bash static/bootstrap.sh; fi
+  @echo "Local configuration: "{{ quote(CONFIG_FILE) }}" (edit it to enable modules)."

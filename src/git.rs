@@ -1,265 +1,224 @@
+//! Git history and transport. Generation and runtime change detection live elsewhere.
+use anyhow::{Context, ensure};
 use std::{
-    collections::HashMap,
-    fs,
-    hash::{DefaultHasher, Hasher},
-    process::Command,
+    path::{Path, PathBuf},
+    process::Output,
 };
 
-use anyhow::Context;
-
-use crate::config::Config;
-
-fn is_git_repo(conf: &Config) -> bool {
-    fs::metadata(conf.path.join(".git")).map_or(false, |meta| meta.is_dir())
+pub struct Repository {
+    pub root: PathBuf,
 }
 
-type LocalDiffHashes = HashMap<String, u64>;
-
-pub struct DiffTracker<'a> {
-    conf: &'a Config,
-    before_hashes: LocalDiffHashes,
-    stashed_changes: Option<String>,
-}
-
-pub enum DiffTrackerResult<'a> {
-    Success(DiffTracker<'a>),
-    NeedsConfigReload,
-    NotAGitRepo,
-}
-
-impl<'a> DiffTracker<'a> {
-    pub fn start(conf: &'a Config) -> anyhow::Result<DiffTrackerResult<'a>> {
-        // Required for git to create the files in the shared repository with group write permissions
-        unsafe { libc::umask(0o0002) };
-        if !is_git_repo(conf) {
-            println!("Directory is not a git repository yet skipping diff tracking");
-            return Ok(DiffTrackerResult::NotAGitRepo);
+impl Repository {
+    pub fn open(root: &Path) -> anyhow::Result<Option<Self>> {
+        let repo = Self {
+            root: root.to_owned(),
+        };
+        // Do not silently join an enclosing repository, including through worktrees.
+        let out = repo.output(&["rev-parse", "--show-toplevel"])?;
+        if !out.status.success() {
+            ensure!(
+                !root.join(".git").exists(),
+                "Cannot read installation Git repository: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            // A failed discovery (e.g. dubious ownership) must not trigger reinitialization.
+            ensure!(
+                String::from_utf8_lossy(&out.stderr).contains("not a git repository"),
+                "Git discovery failed: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            return Ok(None);
         }
-        let tmp_self = Self {
-            conf,
-            before_hashes: LocalDiffHashes::default(),
-            stashed_changes: None,
-        };
-        let git_diff = tmp_self.get_modified()?;
-        let stashed_changes = if !git_diff.is_empty() {
-            if tmp_self.is_initial_commit()? {
-                println!("No initial commit yet not stashing changes");
-                None
-            } else {
-                tmp_self.stash_all()?;
-                Some(git_diff)
+        let top = PathBuf::from(String::from_utf8(out.stdout)?.trim_end_matches('\n'));
+        ensure!(
+            top.canonicalize()? == root.canonicalize()?,
+            "The installation directory must be the Git repository root"
+        );
+        Ok(Some(repo))
+    }
+
+    pub fn initialize(root: &Path) -> anyhow::Result<Self> {
+        let repo = match Self::open(root)? {
+            Some(repo) => repo,
+            None => {
+                let repo = Self {
+                    root: root.to_owned(),
+                };
+                repo.run(&["init", "-b", "main", "--shared=group"])?;
+                repo
             }
-        } else {
-            None
         };
-        if conf.git_sync.unwrap_or_else(|| tmp_self.has_remote()) {
-            let repo_hash_before = tmp_self.head_hash()?.stdout;
-            println!("Pulling changes from remote");
-            tmp_self.pull()?;
-            let repo_hash_after = tmp_self.head_hash()?.stdout;
-            if repo_hash_before != repo_hash_after {
-                return Ok(DiffTrackerResult::NeedsConfigReload);
+        for (key, fallback) in [
+            ("user.name", "Bridgehead"),
+            ("user.email", "bridgehead@samply.de"),
+        ] {
+            if !repo.output(&["config", "--get", key])?.status.success() {
+                repo.run(&["config", "--local", key, fallback])?;
             }
         }
-        Ok(DiffTrackerResult::Success(Self {
-            stashed_changes,
-            before_hashes: tmp_self
-                .hash_untracked_files()
-                .context("Failed to start tracking local files")?,
-            ..tmp_self
-        }))
+        Ok(repo)
     }
 
-    fn git_command(&self) -> Command {
-        let mut cmd = Command::new("git");
-        cmd.current_dir(&self.conf.path);
-        cmd
+    pub fn output(&self, args: &[&str]) -> anyhow::Result<Output> {
+        duct::cmd("git", args)
+            .env("LC_ALL", "C")
+            .dir(&self.root)
+            .stdout_capture()
+            .stderr_capture()
+            .unchecked()
+            .run()
+            .context("Failed to execute git")
     }
-
-    fn get_modified(&self) -> anyhow::Result<String> {
-        let status = self
-            .git_command()
-            .arg("status")
-            .arg("--porcelain")
-            .output()?;
-        if !status.status.success() {
-            anyhow::bail!(
-                "Failed to get status: {}",
-                String::from_utf8_lossy(&status.stderr)
-            );
-        }
-        let files = String::from_utf8_lossy(&status.stdout);
-        Ok(files.into_owned())
+    pub fn run(&self, args: &[&str]) -> anyhow::Result<Vec<u8>> {
+        let out = self.output(args)?;
+        ensure!(
+            out.status.success(),
+            "git {} failed: {}{}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+        Ok(out.stdout)
     }
-
-    fn hash_untracked_files(&self) -> anyhow::Result<LocalDiffHashes> {
-        let status = self
-            .git_command()
-            .args(["ls-files", "--others", "--exclude-standard", "--ignored"])
-            .output()?;
-        if !status.status.success() {
-            anyhow::bail!(
-                "Failed to get untracked files: {}",
-                String::from_utf8_lossy(&status.stderr)
-            );
-        }
-        let output = String::from_utf8_lossy(&status.stdout);
-        let mut hash_map = LocalDiffHashes::default();
-        for file_path in output.lines() {
-            let mut hasher = DefaultHasher::new();
-            let path = self.conf.path.join(file_path);
-            let file = fs::read(&path)
-                .with_context(|| format!("Failed to read file: `{}`", path.display()))?;
-            hasher.write(&file);
-            hash_map.insert(file_path.to_string(), hasher.finish());
-        }
-        Ok(hash_map)
-    }
-
-    fn is_initial_commit(&self) -> anyhow::Result<bool> {
-        Ok(!self.head_hash()?.status.success())
-    }
-
-    fn head_hash(&self) -> anyhow::Result<std::process::Output> {
+    pub fn has_head(&self) -> anyhow::Result<bool> {
         Ok(self
-            .git_command()
-            .arg("rev-parse")
-            .arg("--verify")
-            .arg("HEAD")
-            .output()?)
+            .output(&["rev-parse", "--verify", "HEAD"])?
+            .status
+            .success())
     }
-
-    fn stash_all(&self) -> anyhow::Result<()> {
-        println!("Stashing untracked changes:\n{}", self.get_modified()?);
-        let status = self
-            .git_command()
-            .args(["stash", "push", "-m", "auto-stash", "--include-untracked"])
-            .output()?;
-        if !status.status.success() {
-            anyhow::bail!(
-                "Failed to stash changes: {}",
-                String::from_utf8_lossy(&status.stderr)
+    pub fn ensure_idle(&self) -> anyhow::Result<()> {
+        for marker in [
+            "MERGE_HEAD",
+            "CHERRY_PICK_HEAD",
+            "REVERT_HEAD",
+            "rebase-merge",
+            "rebase-apply",
+            "sequencer",
+        ] {
+            let path = self.run(&["rev-parse", "--git-path", marker])?;
+            let path = String::from_utf8(path)?;
+            ensure!(
+                !self.root.join(path.trim_end()).exists(),
+                "Finish or abort the current Git operation before updating ({marker})"
             );
         }
+        ensure!(
+            self.run(&["ls-files", "-u"])?.is_empty(),
+            "Resolve Git conflicts before updating"
+        );
+        ensure!(
+            self.run(&["ls-files", "--", ".rusthead"])?.is_empty(),
+            "Internal .rusthead state must not be tracked by Git"
+        );
+        ensure!(
+            self.run(&[
+                "ls-files",
+                "--",
+                ".env",
+                "config.local.toml",
+                "pki",
+                "trusted-ca-certs",
+                "traefik-tls"
+            ])?
+            .is_empty(),
+            "Local credentials and certificates must be untracked before updating"
+        );
         Ok(())
     }
-
-    fn git_add_all(&self) -> anyhow::Result<()> {
-        let status = self.git_command().arg("add").arg(".").output()?;
-        if !status.status.success() {
+    pub fn dirty(&self) -> anyhow::Result<bool> {
+        Ok(!self
+            .run(&[
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+                "--",
+                ".",
+                ":(exclude).rusthead",
+            ])?
+            .is_empty())
+    }
+    pub fn generated_dirty(&self) -> anyhow::Result<bool> {
+        Ok(!self
+            .run(&[
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+                "--",
+                "services",
+                "docker-image.lock.yml",
+            ])?
+            .is_empty())
+    }
+    pub fn upstream(&self) -> anyhow::Result<(String, String)> {
+        let branch = self
+            .run(&["symbolic-ref", "--quiet", "--short", "HEAD"])
+            .context("git_sync requires a branch with an upstream")?;
+        let branch = String::from_utf8(branch)?.trim().to_owned();
+        let remote = String::from_utf8(
+            self.run(&["config", "--get", &format!("branch.{branch}.remote")])
+                .context("git_sync requires a configured upstream")?,
+        )?
+        .trim()
+        .to_owned();
+        let target = String::from_utf8(
+            self.run(&["config", "--get", &format!("branch.{branch}.merge")])
+                .context("git_sync requires a configured upstream")?,
+        )?
+        .trim()
+        .to_owned();
+        ensure!(
+            !remote.is_empty() && !remote.starts_with('-') && target.starts_with("refs/heads/"),
+            "Unsupported Git upstream configuration"
+        );
+        Ok((remote, target))
+    }
+    pub fn sync(&self, upstream: &(String, String)) -> anyhow::Result<()> {
+        self.run(&["fetch", &upstream.0, &upstream.1])?;
+        if !self.has_head()? {
             anyhow::bail!(
-                "Failed to add changes: {}",
-                String::from_utf8_lossy(&status.stderr)
+                "Create the initial local commit with update commit before pulling an upstream"
             );
         }
+        if self
+            .output(&["merge-base", "--is-ancestor", "FETCH_HEAD", "HEAD"])?
+            .status
+            .success()
+        {
+            return Ok(()); // equal or locally ahead: publish after generation
+        }
+        ensure!(
+            self.output(&["merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"])?
+                .status
+                .success(),
+            "Local and upstream histories diverged; reconcile them manually and retry"
+        );
+        self.run(&["merge", "--ff-only", "FETCH_HEAD"])?;
         Ok(())
     }
-
-    /// Commit all changes to git. Return true if there were any changes to local or git tracked files.
-    pub fn commit(self) -> anyhow::Result<bool> {
-        let git_diff = self.get_modified()?;
-        let after_hashes = self.hash_untracked_files()?;
-        let local_diff = compute_local_file_diff(&self.before_hashes, &after_hashes);
-        let local_diff_str = local_diff
-            .iter()
-            .map(|(file, changed)| format!("{changed} {file}"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let mut cmd = self.git_command();
-        cmd.arg("commit").arg("-m");
-        match (git_diff.is_empty(), local_diff.is_empty()) {
-            (true, true) => {
-                cmd.arg("Nothing changed");
-                cmd.arg("--allow-empty");
-            }
-            (true, false) => {
-                cmd.arg(format!(
-                    "Only local files changed\n\nlocal:\n{local_diff_str}"
-                ));
-                cmd.arg("--allow-empty");
-            }
-            (false, true) => {
-                self.git_add_all()?;
-                cmd.arg(format!("Git files changed\n\ngit:\n{git_diff}"));
-            }
-            (false, false) => {
-                self.git_add_all()?;
-                cmd.arg(format!(
-                    "Local files and git changed\n\ngit:\n{git_diff}\nlocal:\n{local_diff_str}"
-                ));
-            }
+    pub fn commit(&self) -> anyhow::Result<()> {
+        self.run(&["add", "-A", "--", "."])?;
+        let diff = self.output(&["diff", "--cached", "--quiet"])?;
+        match diff.status.code() {
+            Some(0) if self.has_head()? => return Ok(()),
+            Some(0 | 1) => {}
+            _ => anyhow::bail!(
+                "Failed to inspect staged changes: {}",
+                String::from_utf8_lossy(&diff.stderr)
+            ),
         }
-        if let Some(ref stashed_changes) = self.stashed_changes {
-            cmd.arg("-m")
-                .arg(format!("stashed changes:\n{stashed_changes}"));
-        }
-        let status = cmd.output()?;
-        if !status.status.success() {
-            anyhow::bail!(
-                "Failed to commit changes: {}",
-                String::from_utf8_lossy(&status.stdout)
-            );
-        }
-        if self.conf.git_sync.unwrap_or_else(|| self.has_remote()) {
-            println!("Pushing changes to remote");
-            self.push()?;
-        }
-        Ok(!(git_diff.is_empty() && local_diff.is_empty()))
-    }
-
-    fn has_remote(&self) -> bool {
-        self.git_command()
-            .arg("remote")
-            .output()
-            .is_ok_and(|output| output.status.success() && !output.stdout.is_empty())
-    }
-
-    fn pull(&self) -> anyhow::Result<()> {
-        let output = self.git_command().arg("pull").arg("--rebase").output()?;
-        if !output.status.success() {
-            anyhow::bail!(
-                "Failed to pull changes: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
+        self.run(&[
+            "commit",
+            "--allow-empty",
+            "-m",
+            "Update bridgehead configuration",
+        ])?;
         Ok(())
     }
-
-    fn push(&self) -> anyhow::Result<()> {
-        let output = self.git_command().arg("push").output()?;
-        if !output.status.success() {
-            anyhow::bail!(
-                "Failed to push changes: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
+    pub fn push(&self, upstream: &(String, String)) -> anyhow::Result<()> {
+        self.run(&["push", &upstream.0, &format!("HEAD:{}", upstream.1)])?;
         Ok(())
     }
-}
-
-fn compute_local_file_diff<'a>(
-    before_hashes: &'a LocalDiffHashes,
-    after_hashes: &'a LocalDiffHashes,
-) -> HashMap<&'a str, char> {
-    let mut diff = HashMap::new();
-
-    for (file, &before_hash) in before_hashes {
-        if let Some(&after_hash) = after_hashes.get(file) {
-            if before_hash == after_hash {
-                continue;
-            } else {
-                diff.insert(file.as_str(), 'M');
-            }
-        } else {
-            diff.insert(file.as_str(), 'D');
-        }
-    }
-
-    for file in after_hashes.keys() {
-        if !before_hashes.contains_key(file) {
-            diff.insert(file.as_str(), 'A');
-        }
-    }
-
-    diff
 }

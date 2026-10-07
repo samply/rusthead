@@ -1,10 +1,5 @@
 use std::{
-    cell::RefCell,
-    collections::{BTreeMap, BTreeSet},
-    fs,
-    marker::PhantomData,
-    path::PathBuf,
-    str::FromStr,
+    cell::RefCell, collections::BTreeMap, fs, marker::PhantomData, path::PathBuf, str::FromStr,
 };
 
 use askama::Template;
@@ -63,7 +58,7 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
     type ServiceConfig = &'static Config;
 
     fn from_config(conf: Self::ServiceConfig, (fw_proxy,): Deps<Self>) -> Self {
-        BEAM_NETWORKS.with_borrow_mut(|nets| nets.insert(T::broker_id()));
+        conf.beam_networks.borrow_mut().insert(T::broker_id());
         fs::create_dir_all(conf.path.join("pki")).unwrap();
         BeamProxy {
             broker_provider: PhantomData,
@@ -79,8 +74,4 @@ impl<T: BrokerProvider> Service for BeamProxy<T> {
     fn service_name() -> String {
         format!("{}-beam-proxy", T::network_name())
     }
-}
-
-thread_local! {
-    pub static BEAM_NETWORKS: RefCell<BTreeSet<String>> = RefCell::default();
 }
