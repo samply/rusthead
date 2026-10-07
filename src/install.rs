@@ -28,7 +28,11 @@ fn load_materialized(config: &PathBuf) -> anyhow::Result<&'static Config> {
     Ok(conf)
 }
 
-pub fn install(config: &PathBuf, no_self_update: bool) -> anyhow::Result<ExitCode> {
+pub fn install(
+    config: &PathBuf,
+    no_self_update: bool,
+    no_systemd: bool,
+) -> anyhow::Result<ExitCode> {
     require_root()?;
     let conf = load_materialized(config)?;
     // Persist the seed and pending networks before update runs in another process.
@@ -72,16 +76,17 @@ pub fn install(config: &PathBuf, no_self_update: bool) -> anyhow::Result<ExitCod
     configure_git(conf)?;
     let executable = install_binary(conf, &executable)?;
 
-    let systemd = match cmd!("systemctl", "status", "docker")
-        .stdout_null()
-        .stderr_null()
-        .unchecked()
-        .run()
-    {
-        Ok(output) => output.status.success(),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
-        Err(error) => return Err(error).context("Failed to check Docker systemd service"),
-    };
+    let systemd = !no_systemd
+        && match cmd!("systemctl", "status", "docker")
+            .stdout_null()
+            .stderr_null()
+            .unchecked()
+            .run()
+        {
+            Ok(output) => output.status.success(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error).context("Failed to check Docker systemd service"),
+        };
     if systemd {
         install_systemd(
             Path::new("/etc/systemd/system"),
@@ -91,6 +96,8 @@ pub fn install(config: &PathBuf, no_self_update: bool) -> anyhow::Result<ExitCod
         )?;
         cmd!("systemctl", "daemon-reload").run()?;
         cmd!("systemctl", "enable", "bridgehead.service").run()?;
+    } else if no_systemd {
+        println!("Skipping systemd setup (--no-systemd).");
     } else {
         println!(
             "Systemd is not active or docker is not running via systemd. Skipping systemd setup."
@@ -119,10 +126,14 @@ pub fn install(config: &PathBuf, no_self_update: bool) -> anyhow::Result<ExitCod
         cmd!("systemctl", "enable", "--now", "bridgehead-update.timer").run()?;
     }
     println!("Installation complete.");
-    println!(
-        "Start with 'systemctl start bridgehead' or 'rusthead --config {} compose up'.",
-        config.display()
-    );
+    if systemd {
+        println!("Start with 'sudo systemctl start bridgehead'.");
+    } else {
+        println!(
+            "Start with 'rusthead --config {} compose up -d'.",
+            config.display()
+        );
+    }
     Ok(ExitCode::SUCCESS)
 }
 

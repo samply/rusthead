@@ -33,7 +33,11 @@ enum Subcommand {
     /// Print a Bash script that installs the native binary and creates a configuration.
     Bootstrap,
     Enroll,
-    Install,
+    Install {
+        /// Skip systemd service and update timer setup.
+        #[clap(long)]
+        no_systemd: bool,
+    },
 }
 
 #[derive(Debug, clap::Parser)]
@@ -88,7 +92,9 @@ fn main() -> anyhow::Result<ExitCode> {
         Subcommand::Update { mode } => update::run(&config, *mode, args.no_self_update),
         Subcommand::Bootstrap => unreachable!("bootstrap is handled before loading configuration"),
         Subcommand::Enroll => install::enroll(&config),
-        Subcommand::Install => install::install(&config, args.no_self_update),
+        Subcommand::Install { no_systemd } => {
+            install::install(&config, args.no_self_update, *no_systemd)
+        }
     }
 }
 

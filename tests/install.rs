@@ -63,6 +63,10 @@ if [ ! -f "$key" ]; then printf 'private key\n' > "$key"; fi
     }
 
     fn run_command(&self, command: &str, update_status: u8) -> Output {
+        self.run_command_with_args(command, &[], update_status)
+    }
+
+    fn run_command_with_args(&self, command: &str, args: &[&str], update_status: u8) -> Output {
         let managed = self
             .temp
             .path()
@@ -74,6 +78,7 @@ if [ ! -f "$key" ]; then printf 'private key\n' > "$key"; fi
         };
         Command::new(executable)
             .args(["--config", "site with spaces/custom.toml", command])
+            .args(args)
             .current_dir(self.temp.path())
             .env(
                 "PATH",
@@ -114,6 +119,28 @@ if [ ! -f "$key" ]; then printf 'private key\n' > "$key"; fi
         )
         .unwrap()
     }
+}
+
+#[test]
+#[ignore = "requires root; run with unshare --user --map-root-user cargo test --test install -- --ignored"]
+fn install_without_systemd_skips_systemctl_and_still_enrolls() {
+    assert_eq!(unsafe { libc::geteuid() }, 0);
+    let installation = Installation::new();
+    let root = installation.temp.path();
+    script(
+        &root.join("bin/systemctl"),
+        "touch \"$INSTALL_TEST_ROOT/systemctl-called\"\nexit 3",
+    );
+    let result = installation.run_command_with_args("install", &["--no-systemd"], 3);
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    assert!(!root.join("systemctl-called").exists());
+    let log = fs::read_to_string(root.join("log")).unwrap();
+    assert!(log.contains("commit"));
+    assert!(log.contains("enroll"));
 }
 
 #[test]
