@@ -53,7 +53,7 @@ pub struct Config {
 }
 
 fn default_image() -> String {
-    "samply/rusthead:latest".to_string()
+    "docker.io/samply/rusthead:latest".to_string()
 }
 
 #[derive(Debug, Deserialize, Default)]
