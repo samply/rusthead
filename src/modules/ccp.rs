@@ -82,8 +82,8 @@ impl BlazeProvider for CcpDefault {
         })
     }
 
-    fn blaze_config(conf: &'static Config) -> Option<&'static BlazeConfig> {
-        conf.ccp.as_ref()?.blaze.as_ref()
+    fn blaze_config(conf: &Config) -> Option<BlazeConfig> {
+        conf.ccp.as_ref()?.blaze.clone()
     }
 }
 

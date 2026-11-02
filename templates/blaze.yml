@@ -5,7 +5,7 @@ services:
     image: docker.verbis.dkfz.de/cache/samply/blaze:latest
     environment:
       BASE_URL: {{ Self::get_url().to_string().trim_end_matches('/') }}
-      ENFORCE_REFERENTIAL_INTEGRITY: "false"
+      ENFORCE_REFERENTIAL_INTEGRITY: "{{ tuning.referential_integrity }}"
     {%- if let Some(heap_size) = tuning.heap_size %}
       JAVA_TOOL_OPTIONS: "-Xmx{{ heap_size }}"
     {%- endif %}

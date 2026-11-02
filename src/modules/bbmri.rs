@@ -63,8 +63,8 @@ impl BlazeProvider for Bbmri {
         })
     }
 
-    fn blaze_config(conf: &'static crate::config::Config) -> Option<&'static BlazeConfig> {
-        conf.bbmri.as_ref()?.blaze.as_ref()
+    fn blaze_config(conf: &crate::config::Config) -> Option<BlazeConfig> {
+        conf.bbmri.as_ref()?.blaze.clone()
     }
 }
 
