@@ -11,6 +11,9 @@ services:
       BROKER_URL: https://broker.bbmri.de/
       PROXY_ID: dummy.broker.bbmri.de
       APP_focus_KEY: "${GBN_BEAM_PROXY_FOCUS_KEY}"
+      APP_hap-focus_KEY: "${GBN_BEAM_PROXY_HAP_FOCUS_KEY}"
+      APP_pop-focus_KEY: "${GBN_BEAM_PROXY_POP_FOCUS_KEY}"
+      APP_suep-focus_KEY: "${GBN_BEAM_PROXY_SUEP_FOCUS_KEY}"
       ROOTCERT_FILE: /conf/root.crt.pem
       PRIVKEY_FILE: /run/secrets/proxy.pem
       TLS_CA_CERTIFICATES_DIR: /conf/trusted-ca-certs

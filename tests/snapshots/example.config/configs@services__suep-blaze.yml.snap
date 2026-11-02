@@ -1,0 +1,22 @@
+---
+source: src/config.rs
+expression: file
+info: services/suep-blaze.yml
+input_file: tests/configs/example.config.toml
+---
+
+
+services:
+  suep-blaze:
+    image: docker.verbis.dkfz.de/cache/samply/blaze:latest
+    environment:
+      BASE_URL: http://suep-blaze:8080
+      ENFORCE_REFERENTIAL_INTEGRITY: "false"
+      DB_BLOCK_CACHE_SIZE: "1024"
+      CQL_EXPR_CACHE_SIZE: "128"
+    volumes:
+      - "suep-blaze-data:/app/data"
+    
+
+volumes:
+  suep-blaze-data:

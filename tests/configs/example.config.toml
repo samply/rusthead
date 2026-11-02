@@ -8,15 +8,15 @@ datashield = {}
 obds2fhir = {}
 
 [ccp.id_manager]
-upload_apikey="test_upload_apikey"
-read_apikey="test_read_apikey"
-central_patientlist_apikey="test_central_patientlist_apikey"
-controlnumbergenerator_apikey="test_controlnumbergenerator_apikey"
-auth_cookie_secret="test_auth_cookie_secret"
+upload_apikey = "test_upload_apikey"
+read_apikey = "test_read_apikey"
+central_patientlist_apikey = "test_central_patientlist_apikey"
+controlnumbergenerator_apikey = "test_controlnumbergenerator_apikey"
+auth_cookie_secret = "test_auth_cookie_secret"
 
 [ccp.id_manager.seeds]
-BK=[1,2,3]
-MDS=[1,2,3]
+BK = [1, 2, 3]
+MDS = [1, 2, 3]
 
 [bbmri]
 gbn = true
@@ -27,3 +27,5 @@ password = "test"
 
 [dnpm.node]
 zpm_site = "dummy"
+
+[napkon]
