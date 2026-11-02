@@ -13,7 +13,7 @@ use url::{Host, Url};
 
 use crate::{
     enrollment::Enrollment,
-    modules::{BbmriConfig, CcpConfig, DnpmConfig, EucaimConfig},
+    modules::{BbmriConfig, CcpConfig, DnpmConfig, EucaimConfig, NapkonConfig},
     services::{BasicAuthUser, Service, TraefikConfig},
 };
 
@@ -37,6 +37,7 @@ pub struct Config {
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
     pub dnpm: Option<DnpmConfig>,
+    pub napkon: Option<NapkonConfig>,
     pub eucaim: Option<EucaimConfig>,
     pub traefik: Option<TraefikConfig>,
     /// Path to the folder in which this config.toml was located

@@ -7,8 +7,8 @@ use crate::{
     config::Config,
     services::{
         Blaze, BlazeConfig, BlazeProvider, BlazeTraefikConfig, BrokerProvider, DataShield,
-        Exporter, Focus, IdManagement, IdManagementConfig, OidcProvider, ServiceMap, Teiler,
-        TeilerConfig, Transfair, TransfairConfig,
+        Exporter, Focus, FocusConfig, IdManagement, IdManagementConfig, OidcProvider, ServiceMap,
+        Teiler, TeilerConfig, Transfair, TransfairConfig,
         obds2fhir::{Obds2Fhir, Obds2FhirConfig},
         podest2fhir::{Podest2Fhir, Podest2FhirConfig},
     },
@@ -40,7 +40,7 @@ impl Module for CcpDefault {
         let Some(ccp_conf) = conf.ccp.as_ref() else {
             return;
         };
-        service_map.install_with_config::<Focus<Self, Blaze<Self>>>("main".into());
+        service_map.install_with_config::<Focus<Self, Blaze<Self>>>(FocusConfig::from_tag("main"));
         if let Some(idm_conf) = &ccp_conf.id_manager {
             service_map.install_with_config::<IdManagement<Self>>((idm_conf, conf));
             if let Some(obds_conf) = &ccp_conf.obds2fhir {
@@ -82,8 +82,8 @@ impl BlazeProvider for CcpDefault {
         })
     }
 
-    fn blaze_config(conf: &'static Config) -> Option<&'static BlazeConfig> {
-        conf.ccp.as_ref()?.blaze.as_ref()
+    fn blaze_config(conf: &Config) -> Option<BlazeConfig> {
+        conf.ccp.as_ref()?.blaze.clone()
     }
 }
 

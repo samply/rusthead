@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::config::Environment;
 use crate::services::{
-    Blaze, BlazeConfig, BlazeProvider, BrokerProvider, DirectorySyncConfig, Focus,
+    Blaze, BlazeConfig, BlazeProvider, BrokerProvider, DirectorySyncConfig, Focus, FocusConfig,
 };
 use crate::utils::enabled;
 
@@ -33,13 +33,17 @@ impl Module for Bbmri {
         service_map.install_default::<Blaze<Self>>();
         if bbmri_conf.eric {
             if let Environment::Acceptance = conf.environment {
-                service_map.install_with_config::<Focus<EricAcc, Blaze<Self>>>("develop".into());
+                service_map.install_with_config::<Focus<EricAcc, Blaze<Self>>>(
+                    FocusConfig::from_tag("develop"),
+                );
             } else {
-                service_map.install_with_config::<Focus<Eric, Blaze<Self>>>("main".into());
+                service_map
+                    .install_with_config::<Focus<Eric, Blaze<Self>>>(FocusConfig::from_tag("main"));
             }
         }
         if bbmri_conf.gbn {
-            service_map.install_with_config::<Focus<Gbn, Blaze<Self>>>("main".into());
+            service_map
+                .install_with_config::<Focus<Gbn, Blaze<Self>>>(FocusConfig::from_tag("main"));
         }
         if let Some(ds_conf) = &bbmri_conf.directory_sync {
             service_map.install_with_config::<crate::services::DirectorySync<Self>>(ds_conf);
@@ -59,8 +63,8 @@ impl BlazeProvider for Bbmri {
         })
     }
 
-    fn blaze_config(conf: &'static crate::config::Config) -> Option<&'static BlazeConfig> {
-        conf.bbmri.as_ref()?.blaze.as_ref()
+    fn blaze_config(conf: &crate::config::Config) -> Option<BlazeConfig> {
+        conf.bbmri.as_ref()?.blaze.clone()
     }
 }
 
@@ -80,7 +84,7 @@ impl BrokerProvider for Eric {
     }
 }
 
-struct Gbn;
+pub struct Gbn;
 
 impl BrokerProvider for Gbn {
     fn broker_url() -> url::Url {

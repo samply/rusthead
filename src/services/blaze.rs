@@ -14,6 +14,8 @@ use super::{Service, Traefik};
 #[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct BlazeConfig {
+    #[serde(default)]
+    pub referential_integrity: bool,
     /// JVM heap size, passed as `-Xmx`. Unset leaves the JVM default of 25% of the host memory.
     pub heap_size: Option<String>,
     /// RocksDB block cache in MiB. Lives outside the JVM heap, so it adds to `heap_size`.
@@ -37,6 +39,7 @@ fn default_cql_expr_cache_size() -> u32 {
 impl Default for BlazeConfig {
     fn default() -> Self {
         Self {
+            referential_integrity: false,
             heap_size: None,
             block_cache_size: default_block_cache_size(),
             cql_expr_cache_size: default_cql_expr_cache_size(),
@@ -77,7 +80,7 @@ impl<T: BlazeProvider> Service for Blaze<T> {
         Self {
             r#for: PhantomData,
             traefik_conf,
-            tuning: T::blaze_config(conf).cloned().unwrap_or_default(),
+            tuning: T::blaze_config(conf).unwrap_or_default(),
         }
     }
 
@@ -95,7 +98,7 @@ pub trait BlazeProvider: 'static {
     }
 
     /// Tuning for this project's Blaze. Defaults to [`BlazeConfig::default`] when absent.
-    fn blaze_config(_conf: &'static Config) -> Option<&'static BlazeConfig> {
+    fn blaze_config(_conf: &Config) -> Option<BlazeConfig> {
         None
     }
 }

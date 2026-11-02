@@ -2,12 +2,14 @@ mod bbmri;
 mod ccp;
 mod dnpm;
 mod eucaim;
+mod napkon;
 
 use crate::{Config, services::ServiceMap};
 pub use bbmri::BbmriConfig;
 pub use ccp::{CcpConfig, CcpDefault};
 pub use dnpm::DnpmConfig;
 pub use eucaim::{EucaimConfig, EucaimEndpointType};
+pub use napkon::NapkonConfig;
 
 pub trait Module {
     fn install(&self, service_map: &mut ServiceMap, conf: &'static Config);
@@ -24,4 +26,5 @@ pub const MODULES: &[&dyn Module] = &[
     &bbmri::Bbmri,
     &dnpm::Dnpm,
     &eucaim::Eucaim,
+    &napkon::Napkon,
 ];

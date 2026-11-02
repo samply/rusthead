@@ -1,11 +1,11 @@
 ---
 source: src/config.rs
 expression: file
-info: services/eric-focus.yml
+info: services/eric-bbmri-blaze-focus.yml
 input_file: tests/configs/example.config.toml
 ---
 services:
-  eric-focus:
+  eric-bbmri-blaze-focus:
     image: docker.verbis.dkfz.de/cache/samply/focus:main
     environment:
       BEAM_APP_ID_LONG: focus.dummy.broker.bbmri.samply.de

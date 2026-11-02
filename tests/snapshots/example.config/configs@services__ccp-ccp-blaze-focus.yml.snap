@@ -1,11 +1,11 @@
 ---
 source: src/config.rs
 expression: file
-info: services/ccp-focus.yml
+info: services/ccp-ccp-blaze-focus.yml
 input_file: tests/configs/example.config.toml
 ---
 services:
-  ccp-focus:
+  ccp-ccp-blaze-focus:
     image: docker.verbis.dkfz.de/cache/samply/focus:main
     environment:
       BEAM_APP_ID_LONG: focus.dummy.broker.ccp-it.dktk.dkfz.de

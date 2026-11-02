@@ -33,15 +33,32 @@ where
     postgres_connection_string: Option<String>,
 }
 
+pub struct FocusConfig {
+    pub tag: String,
+    pub app_name: &'static str,
+}
+
+impl FocusConfig {
+    pub fn from_tag(tag: impl Into<String>) -> Self {
+        Self {
+            tag: tag.into(),
+            app_name: "focus",
+        }
+    }
+}
+
 impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
     type Dependencies = (BeamProxy<T>, Blaze<B>);
-    type ServiceConfig = String;
+    type ServiceConfig = FocusConfig;
 
-    fn from_config(tag: Self::ServiceConfig, (beam_proxy, _blaze): Deps<Self>) -> Self
+    fn from_config(
+        FocusConfig { tag, app_name }: Self::ServiceConfig,
+        (beam_proxy, _blaze): Deps<Self>,
+    ) -> Self
     where
         Self: Sized,
     {
-        let beam = beam_proxy.add_service("focus");
+        let beam = beam_proxy.add_service(app_name);
         Focus {
             beam,
             beam_and_blaze: PhantomData,
@@ -56,7 +73,7 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
     }
 
     fn service_name() -> String {
-        format!("{}-focus", T::network_name())
+        format!("{}-{}-focus", T::network_name(), Blaze::<B>::service_name())
     }
 }
 
