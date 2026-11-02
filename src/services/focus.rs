@@ -73,7 +73,7 @@ impl<T: BrokerProvider, B: BlazeProvider> Service for Focus<T, Blaze<B>> {
     }
 
     fn service_name() -> String {
-        format!("{}-focus", T::network_name())
+        format!("{}-{}-focus", T::network_name(), Blaze::<B>::service_name())
     }
 }
 
