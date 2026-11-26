@@ -1,0 +1,5 @@
+site_id = "dummy"
+hostname = "dummy.local"
+environment = "test"
+
+[cce]

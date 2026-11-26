@@ -1,0 +1,9 @@
+site_id = "dummy"
+hostname = "dummy.local"
+
+[cce]
+exporter = {}
+
+[cce.teiler]
+language = "EN"
+backend_image = "ccp/cce-teiler-backend"

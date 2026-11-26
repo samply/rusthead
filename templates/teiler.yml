@@ -1,4 +1,5 @@
 {% let name = Self::service_name() %}
+{%- let backend_image = conf.backend_image.clone().unwrap_or("ccp/dktk-teiler-backend".to_owned()) %}
 services:
   {{ name }}-orchestrator:
     image: docker.verbis.dkfz.de/cache/samply/teiler-orchestrator:latest
@@ -47,7 +48,7 @@ services:
 
 
   {{ name }}-backend:
-    image: docker.verbis.dkfz.de/ccp/dktk-teiler-backend:latest
+    image: docker.verbis.dkfz.de/{{ backend_image }}:latest
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.{{ name }}_backend.rule=PathPrefix(`/{{ name }}-backend`)"

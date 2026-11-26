@@ -1,0 +1,57 @@
+---
+source: src/config.rs
+expression: file
+info: services/cce-exporter.yml
+input_file: tests/configs/cce.toml
+---
+services:
+  cce-exporter:
+    image: docker.verbis.dkfz.de/ccp/dktk-exporter:latest
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
+      LOG_LEVEL: "INFO"
+      EXPORTER_API_KEY: "${CCE_EXPORTER_API_KEY}"
+      CROSS_ORIGINS: "https://dummy.local"
+      EXPORTER_DB_USER: "cce-exporter"
+      EXPORTER_DB_PASSWORD: "${CCE_EXPORTER_DB_PASSWORD}"
+      EXPORTER_DB_URL: "jdbc:postgresql://cce-exporter-db:5432/cce-exporter"
+      HTTP_RELATIVE_PATH: "/cce-exporter"
+      BLAZE_URL: "http://cce-blaze:8080/fhir"
+      HTTP_SERVLET_REQUEST_SCHEME: "https"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.exporter_cce.rule=PathPrefix(`/cce-exporter`)"
+      - "traefik.http.services.exporter_cce.loadbalancer.server.port=8092"
+      - "traefik.http.routers.exporter_cce.tls=true"
+      - "traefik.http.middlewares.exporter_cce_strip.stripprefix.prefixes=/cce-exporter"
+      - "traefik.http.routers.exporter_cce.middlewares=exporter_cce_strip"
+    volumes:
+      - "cce-exporter-files:/app/exporter-files/output"
+    depends_on:
+      - cce-exporter-db
+
+  cce-reporter:
+    image: docker.verbis.dkfz.de/ccp/dktk-reporter:latest
+    environment:
+      JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
+      LOG_LEVEL: "INFO"
+      CROSS_ORIGINS: "https://dummy.local"
+      HTTP_RELATIVE_PATH: "/cce-reporter"
+      EXPORTER_API_KEY: "${CCE_EXPORTER_API_KEY}"
+      EXPORTER_URL: "http://cce-exporter:8092"
+      LOG_FHIR_VALIDATION: "false"
+      HTTP_SERVLET_REQUEST_SCHEME: "https"
+    volumes:
+      - "cce-reporter-files:/app/reports"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.reporter_cce.rule=PathPrefix(`/cce-reporter`)"
+      - "traefik.http.services.reporter_cce.loadbalancer.server.port=8095"
+      - "traefik.http.routers.reporter_cce.tls=true"
+      - "traefik.http.middlewares.reporter_cce_strip.stripprefix.prefixes=/cce-reporter"
+      - "traefik.http.routers.reporter_cce.middlewares=reporter_cce_strip"
+
+
+volumes:
+  cce-exporter-files:
+  cce-reporter-files:

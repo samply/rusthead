@@ -6,7 +6,7 @@ use url::Url;
 
 use crate::{
     config::Config,
-    modules::CcpDefault,
+    modules::{Cce, CcpDefault},
     services::{
         BlazeProvider, Exporter, ForwardProxy, IdManagement, OidcProvider, datashield::DataShield,
     },
@@ -19,6 +19,8 @@ use super::{BrokerProvider, OidcClient, PublicOidcClient, Service};
 pub struct TeilerConfig {
     #[serde(default = "default_language")]
     language: String,
+    /// Image name (without registry and tag) of the teiler backend, e.g. "ccp/cce-teiler-backend"
+    backend_image: Option<String>,
 }
 
 fn default_language() -> String {
@@ -85,5 +87,40 @@ impl Service for Teiler<CcpDefault> {
 
     fn service_name() -> String {
         format!("{}-teiler", CcpDefault::network_name())
+    }
+}
+
+impl Service for Teiler<Cce> {
+    type Dependencies = (ForwardProxy, Option<Exporter<Cce>>);
+
+    type ServiceConfig = (&'static TeilerConfig, &'static Config);
+
+    fn from_config(
+        (conf, global_conf): Self::ServiceConfig,
+        (fw_proxy, exporter): super::Deps<Self>,
+    ) -> Self {
+        Self {
+            project_t: PhantomData,
+            oidc_client: OidcClient::<Cce>::add_public_redirect_path(
+                global_conf,
+                &format!("/{}", Self::service_name()),
+            ),
+            project: Cce::network_name(),
+            conf,
+            forward_proxy_url: fw_proxy.get_url(),
+            exporter: exporter.map(|e| (Exporter::<Cce>::service_name(), e.api_key.clone())),
+            host: global_conf.hostname.to_string(),
+            blaze_host: Cce::balze_service_name(),
+            mtba_enabled: false,
+            datashield_enabled: false,
+            idm_upload_apikey: None,
+            oidc_user_group: format!("CCE_{}", capitalize_first_letter(&global_conf.site_id)),
+            oidc_admin_group: Cce::admin_group(global_conf),
+            opal_host: None,
+        }
+    }
+
+    fn service_name() -> String {
+        format!("{}-teiler", Cce::network_name())
     }
 }

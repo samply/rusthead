@@ -1,0 +1,14 @@
+---
+source: src/config.rs
+expression: file
+info: ".gitignore"
+input_file: tests/configs/cce.toml
+---
+
+.env
+config.local.toml
+/pki
+/trusted-ca-certs
+/traefik-tls
+docker-compose.override.yml
+/.rusthead/

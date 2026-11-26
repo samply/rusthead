@@ -1,0 +1,53 @@
+---
+source: src/config.rs
+expression: file
+info: services/cce-beam-proxy.yml
+input_file: tests/configs/cce.toml
+---
+services:
+  cce-beam-proxy:
+    image: docker.verbis.dkfz.de/cache/samply/beam-proxy:develop
+    environment:
+      BROKER_URL: https://broker.cce.dkfz.de/
+      PROXY_ID: dummy.broker.cce.dkfz.de
+      APP_focus_KEY: "${CCE_BEAM_PROXY_FOCUS_KEY}"
+      ROOTCERT_FILE: /conf/root.crt.pem
+      PRIVKEY_FILE: /run/secrets/proxy.pem
+      TLS_CA_CERTIFICATES_DIR: /conf/trusted-ca-certs
+      ALL_PROXY: http://forward-proxy:3128/
+    volumes:
+      - [TMP_DIR]/trusted-ca-certs:/conf/trusted-ca-certs:ro
+    secrets:
+      - proxy.pem
+    configs:
+      - source: cce.root.crt.pem
+        target: /conf/root.crt.pem
+
+configs:
+  cce.root.crt.pem:
+    content: |
+      -----BEGIN CERTIFICATE-----
+      MIIDNTCCAh2gAwIBAgIUD8gordqfXZkBt/18/i3GL+ZHIfgwDQYJKoZIhvcNAQEL
+      BQAwFjEUMBIGA1UEAxMLQnJva2VyLVJvb3QwHhcNMjYwOTA3MDgzMDA0WhcNMzYw
+      OTA0MDgzMDM0WjAWMRQwEgYDVQQDEwtCcm9rZXItUm9vdDCCASIwDQYJKoZIhvcN
+      AQEBBQADggEPADCCAQoCggEBAMRoq11ZV5FyDNEADhVdPxYEisVbPMMKsXlUxQEW
+      ibv/CgQdrgf+AVTpR9Z9qrMmHCd52bTAkck7C6WES0mGhZ/u/Kgciga+HORVf8H0
+      5YthLcJRO5d5t2e2rquYTRRZzmaeUtYGP/LJe1IdBjZmbzHxzH9IALdQqmtqSMr5
+      kRHd4zzLA8NtzGsJSqOcU5KfDRaA++3kEIWjGVRfzZBSQTj5A8v/98ETDt9HVqq7
+      D9lPEZl9OUF3P3/wJWC/adTYyV1AXf3gET5XNZXftbmvhxO9yhNAxAXS3ogXI6EH
+      fXfvWbv+OKv5jDIwHyLQpBpzfCIPrulaOLpXFXaEH+CPceUCAwEAAaN7MHkwDgYD
+      VR0PAQH/BAQDAgEGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFBddxl5dqafn
+      Lv7QBWkTjsFSGGB6MB8GA1UdIwQYMBaAFBddxl5dqafnLv7QBWkTjsFSGGB6MBYG
+      A1UdEQQPMA2CC0Jyb2tlci1Sb290MA0GCSqGSIb3DQEBCwUAA4IBAQCWfW75sCaL
+      Cx6JaZAWfe3Fhd7QPZmGmeOlkcdJZJ7T6jLIBMcMpAxirCXA0I1omlY0esHnljd5
+      00BX03AVG0McJcclH9yCf5n+eLp0b2c8F1bvgn68I8kQg4SZIdnGL+iot74apRRx
+      3BvQF5IwZbnOD+MENXDzwlrCX7MZwt0/EC3t9tPnVLCZwk/mOXLlr64a+y7D0lKZ
+      2+LJ76Ty7RTGPN5cUgHoRodRcJ37r9Uol2dXezQTBjffLP7Kf/PPIhhjGxximadc
+      /kfmKu4u0e+whQV+8N260+6ScvTr8RArjIwb4vV0NolDwsoUAFaoAvZ5pNRhEnA+
+      2Z8f6iL3sKOW
+      -----END CERTIFICATE-----
+
+
+secrets:
+  proxy.pem:
+    file: [TMP_DIR]/pki/dummy.priv.pem

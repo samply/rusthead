@@ -1,9 +1,10 @@
 {%- let project = project -%}
+{#- dktk exporter/reporter images are published under the ccp namespace for all projects -#}
 {%- let exporter_files_volume = format!("{}-files", Self::service_name()) -%}
 {%- let reporter_files_volume = format!("{}-reporter-files", project) -%}
 services:
   {{ Self::service_name() }}:
-    image: docker.verbis.dkfz.de/{{ project }}/dktk-exporter:latest
+    image: docker.verbis.dkfz.de/ccp/dktk-exporter:latest
     environment:
       JAVA_OPTS: "-Xms1G -Xmx8G -XX:+UseG1GC"
       LOG_LEVEL: "INFO"

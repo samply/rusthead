@@ -13,7 +13,7 @@ use url::{Host, Url};
 
 use crate::{
     enrollment::Enrollment,
-    modules::{BbmriConfig, CcpConfig, DnpmConfig, EucaimConfig, NapkonConfig},
+    modules::{BbmriConfig, CceConfig, CcpConfig, DnpmConfig, EucaimConfig, NapkonConfig},
     services::{BasicAuthUser, Service, TraefikConfig},
 };
 
@@ -34,6 +34,7 @@ pub struct Config {
     #[serde(default)]
     pub git_sync: bool,
     pub https_proxy_url: Option<Url>,
+    pub cce: Option<CceConfig>,
     pub ccp: Option<CcpConfig>,
     pub bbmri: Option<BbmriConfig>,
     pub dnpm: Option<DnpmConfig>,

@@ -1,0 +1,19 @@
+---
+source: src/config.rs
+expression: file
+info: services/cce-exporter-db.yml
+input_file: tests/configs/cce.toml
+---
+
+services:
+  cce-exporter-db:
+    image: docker.verbis.dkfz.de/cache/postgres:15.6-alpine
+    environment:
+      POSTGRES_USER: cce-exporter
+      POSTGRES_DB: cce-exporter
+      POSTGRES_PASSWORD: ${CCE_EXPORTER_DB_PASSWORD}
+    volumes:
+      - "cce-exporter-db:/var/lib/postgresql/data"
+
+volumes:
+  cce-exporter-db:

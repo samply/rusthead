@@ -1,4 +1,5 @@
 mod bbmri;
+mod cce;
 mod ccp;
 mod dnpm;
 mod eucaim;
@@ -6,6 +7,7 @@ mod napkon;
 
 use crate::{Config, services::ServiceMap};
 pub use bbmri::BbmriConfig;
+pub use cce::{Cce, CceConfig};
 pub use ccp::{CcpConfig, CcpDefault};
 pub use dnpm::DnpmConfig;
 pub use eucaim::{EucaimConfig, EucaimEndpointType};
@@ -22,6 +24,7 @@ impl Module for &dyn Module {
 }
 
 pub const MODULES: &[&dyn Module] = &[
+    &cce::Cce,
     &ccp::CcpDefault,
     &bbmri::Bbmri,
     &dnpm::Dnpm,
